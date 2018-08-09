@@ -1,0 +1,10 @@
+---
+- name: Install /tmp/hello.txt
+  hosts: all
+
+  tasks:
+  - name: Install hello file
+    copy:
+      src: files/hello.txt
+      dest: /tmp/hello.txt
+
