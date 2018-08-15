@@ -13,7 +13,8 @@
     when: ansible_virtualization_type == "RHEV" 
 
   - name: ovirt-guest-agent service is running
-    service: ovirt-guest-agent
+    service: 
+      name: ovirt-guest-agent
       state: running
     when: ansible_virtualization_type == "RHEV" 
 
