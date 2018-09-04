@@ -1,0 +1,15 @@
+---
+# Ensure that virtual guests have the guest tools installed.
+  - name: Install ovirt-guest-agent on RHV Guests
+    yum:
+      name: ovirt-guest-agent
+      state: latest
+    when: ansible_virtualization_type == "RHEV" 
+
+  - name: ovirt-guest-agent service is running
+    service: 
+      name: ovirt-guest-agent
+      state: running
+    when: ansible_virtualization_type == "RHEV" 
+
+

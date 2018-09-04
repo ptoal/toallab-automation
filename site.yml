@@ -1,21 +1,6 @@
----
-# This is mostly just a spike at this point.
-# This will eventually be refactored into roles.
+# Toal Lab Site Playbook
 - name: Virtual Machine setup
   hosts: all
   become: true
-
-  tasks:
-  - name: Install ovirt-guest-agent on RHV Guests
-    yum:
-      name: ovirt-guest-agent
-      state: latest
-    when: ansible_virtualization_type == "RHEV" 
-
-  - name: ovirt-guest-agent service is running
-    service: 
-      name: ovirt-guest-agent
-      state: running
-    when: ansible_virtualization_type == "RHEV" 
-
-
+  roles:
+    - toal-common
