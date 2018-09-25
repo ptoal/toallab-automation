@@ -3,13 +3,13 @@
   - name: Install ovirt-guest-agent on RHV Guests
     yum:
       name: ovirt-guest-agent
-      state: latest
-    when: ansible_virtualization_type == "RHEV" 
+      state: present
+    when: ansible_virtualization_type == "RHEV"
 
   - name: ovirt-guest-agent service is running
-    service: 
+    service:
       name: ovirt-guest-agent
       state: running
-    when: ansible_virtualization_type == "RHEV" 
+    when: ansible_virtualization_type == "RHEV"
 
 
