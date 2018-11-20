@@ -2,4 +2,4 @@
 - hosts: localhost
   remote_user: root
   roles:
-    - satellite
+    - juliovp01.ansible_satellite6

@@ -1,0 +1,8 @@
+---
+# handlers file for toal-common
+
+  - name: Ovirt Agent Restart
+    service:
+      name: ovirt-guest-agent
+      state: restarted
+    when: ansible_virtualization_type == "RHEV"

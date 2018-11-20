@@ -1,5 +1,72 @@
 # Toal Lab Site Playbook
-- name: Virtual Machine setup
+- name: Create VMs
+  hosts: vms
+  connection: local
+  gather_facts: no
+  vars:
+    # Hack to work around virtualenv python interpreter
+    ansible_python_interpreter: "{{ ansible_playbook_python }}"
+
+  tasks:
+    - name: Create Satellite VM in RHV
+      ovirt_vm:
+        name: "{{ vm_name }}"
+        state: running
+        memory: "{{ vm_memory }}"
+
+- name: Configure Satellite Servers
+  hosts: satellite
+  become: true
+  roles:
+    - ansible-role-redhat_satellite6_installation
+  pre_tasks:
+    - name: Register to RHSM and connect to Satellite Subscription.
+      tags: rhsm
+      redhat_subscription:
+        state: present
+        auto_attach: yes
+        username: "{{ rhn_username }}"
+        password: "{{ rhn_password }}"
+        pool: "^Red Hat Satellite Infrastructure Subscription$"
+
+    - name: Required Satellite Repos
+      tags: rhsm
+      rhsm_repository:
+        name: "{{ item }}"
+        state: present
+      with_items:
+        - rhel-7-server-rpms 
+        - rhel-server-rhscl-7-rpms
+        - rhel-7-server-satellite-6.4-rpms
+        - rhel-7-server-satellite-maintenance-6-rpms
+        - rhel-7-server-ansible-2.6-rpms
+        - rhel-7-server-rh-common-rpms
+
+    - name: Ensure latest versions of packages
+      yum:
+        name: "*"
+        state: latest
+
+    - name: Latest Version of Satellite
+      yum:
+        name: satellite
+        state: latest
+
+    - name: Chronyd Installed
+      yum:
+        name: chrony
+        state: latest
+      notify: Restart Chrony
+
+    - name: Latest Version of SOS
+      yum:
+        name: sos
+        state: latest
+
+
+
+
+- name: Common Lab Machine Setup
   hosts: all
   become: true
   roles:
