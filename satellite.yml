@@ -1,0 +1,217 @@
+# Playbook to install Satellite server on RHV
+
+# TODO: Autocreate pxeboot environment on tftp server. This was a partial attempt to create the ks file
+# and dump it on the NAS.   
+# Note for my future self: Don't bother trying to attach a VFD/ISO with the ks file.  It will all
+# end in tears, because RHV4.2 doesn't have the APIs / functionality.
+
+# - name: Prepare Kickstart Files
+#   hosts: vms
+#   connection: local
+#   gather_facts: no
+      
+#   tasks:
+    # - name: Get first nfs server
+    #   set_fact: ks_nfs_server="{{ groups['nfs-server'][0] }}"
+    # - set_fact: ks_file="{{ hostvars[ks_nfs_server]['nfs_dir'] }}/{{ inventory_hostname }}.cfg"
+
+    # - name: Copy ks file to builddir
+    #   template:
+    #     src: templates/ks.cfg
+    #     dest: "{{ ks_file }}"
+    #   delegate_to: "{{ ks_nfs_server }}"
+
+- name: Create VMs
+  hosts: vms
+  connection: local
+  gather_facts: no
+  # Never run this, unless specifically enabled
+  tags: 
+   - never
+   - rebuild
+  vars:
+    # Hack to work around virtualenv python interpreter
+    ansible_python_interpreter: "{{ ansible_playbook_python }}"
+
+  tasks:
+    - name: Remove known_hosts entry
+      known_hosts:
+        name: "{{ inventory_hostname }}"
+        state: absent
+
+    - name: Create VM Disks
+      ovirt_disk:
+        auth: "{{ ovirt_auth }}"
+        name: '{{ item.name }}'
+        description: '{{ item.descr }}'
+        interface: '{{ item.interface }}'
+        size: '{{ item.size }}'
+        state: '{{ item.state }}'
+        sparse: '{{ item.sparse }}'
+        wait: true
+        storage_domain: "{{ item.storage_domain }}"
+      async: 300
+      poll: 15
+      loop: "{{ vm_disks }}"
+      # If we change the disks, we will PXE Boot the Server for install
+      notify: PXE Boot
+
+    - name: Create Satellite VM in RHV
+      ovirt_vm:
+        auth: "{{ ovirt_auth }}"
+        name: "{{ vm_name }}"
+        state: present
+        memory: "{{ vm_memory }}"
+        disks: "{{ vm_disks }}"
+        cpu_cores: "{{ vm_cpu_cores }}"
+        operating_system: "{{ vm_os }}"
+        cluster: "{{ vm_cluster }}"
+        type: server
+        graphical_console:
+          protocol:
+            - spice
+            - vnc
+        cluster: Default
+        boot_devices:
+          - hd
+      async: 300
+      poll: 15
+
+    - name: Assign NIC
+      ovirt_nic:
+        auth: "{{ ovirt_auth }}"
+        interface: virtio
+        mac_address: "{{ vm_mac_address }}"
+        name: nic1
+        profile: ovirtmgmt
+        network: ovirtmgmt
+        state: plugged
+        vm: "{{ vm_name }}"
+
+  handlers:    
+    - name: PXE Boot
+      ovirt_vm:
+        auth: "{{ ovirt_auth }}"
+        name: "{{ vm_name }}"
+        boot_devices:
+         - network
+        state: running
+      register: vm_build_result
+
+- name: Ensure Satellite is running and reachable
+  hosts: satellite
+  gather_facts: no
+  connection: local
+  vars:
+    # Hack to work around virtualenv python interpreter
+    ansible_python_interpreter: "{{ ansible_playbook_python }}"
+ 
+  tasks: 
+    - name: VM is running
+      ovirt_vm:
+          auth: "{{ ovirt_auth }}"
+          name: "{{ vm_name }}"
+          state: running
+          boot_devices:
+          - hd
+      
+    - name: Wait for SSH to be ready
+      wait_for_connection:
+        timeout: 1800
+        sleep: 5
+        
+- name: Set up ipa-client
+  hosts: satellite
+  remote_user: root
+  vars:
+    ansible_ssh_pass: "{{ satellite_root_pass }}"
+  become: no
+  roles:
+    - alvaroaleman.freeipa-client 
+  pre_tasks:
+    - name: Register to RHSM and connect to Satellite Subscription.
+      tags: rhsm
+      redhat_subscription:
+        state: present
+        auto_attach: yes
+        username: "{{ rhn_username }}"
+        password: "{{ rhn_password }}"
+        pool: "^Red Hat Satellite Infrastructure Subscription$"
+    - name: Set hostname
+      hostname: 
+        name: "{{ansible_host}}"
+
+- name: Configure Satellite Servers
+  hosts: satellite
+  become: true
+  roles:
+    - ansible-role-redhat_satellite6_installation
+  pre_tasks:
+      # This could take a while, if we are creating the VM from scratch, and installing
+    # the base software
+
+    # - name: Required Satellite Repos
+    #   tags: rhsm
+    #   rhsm_repository:
+    #     name: "{{ item }}"
+    #     state: present
+    #   with_items:
+    #     - rhel-7-server-rpms 
+    #     - rhel-server-rhscl-7-rpms
+    #     - rhel-7-server-satellite-6.4-rpms
+    #     - rhel-7-server-satellite-maintenance-6-rpms
+    #     - rhel-7-server-ansible-2.6-rpms
+    #     - rhel-7-server-rh-common-rpms
+
+    - name: Ensure latest versions of packages
+      yum:
+        name: "*"
+        state: latest
+
+    - name: Chronyd Installed
+      yum:
+        name: chrony
+        state: latest
+      notify: Restart Chrony
+
+    - name: IdM Client
+      yum:
+        name: ipa-client
+        state: latest
+
+    - name: Latest Version of SOS
+      yum:
+        name: sos
+        state: latest
+
+# TODO: Make this work
+# For now:
+# hammer user-group create --admin yes --name satellite_admins
+# hammer user-group external create  --name satellite_admins --user-group satellite_admins --auth-source-id 3
+
+# - name: Satellite configuration
+#   hosts: satellite
+#   gather_facts: no
+#   connection: local
+#   vars:
+#     # Hack to work around virtualenv python interpreter
+#     ansible_python_interpreter: "{{ ansible_playbook_python }}"
+
+#   tasks:
+#     - foreman:
+#         username: admin
+#         password: "{{satellite_deployment_admin_password}}"
+#         server_url: "https://{{satellite_deployment_hostname_full}}"
+#         entity: user-group
+#         params:
+#           name: satellite_admins
+#           admin: yes
+
+#     - foreman:
+#         username: admin
+#         password: "{{satellite_deployment_admin_password}}"
+#         server_url: "https://{{satellite_deployment_hostname_full}}"
+#         entity: 
+#         params:
+#           name: satellite_admins
+#           admin: yes
