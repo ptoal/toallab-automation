@@ -1,0 +1,12 @@
+---
+- name: restart sssd
+  service: name=sssd state=restarted
+
+- name: restart sshd
+  service: name=sshd state=restarted
+
+- name: execute pam-auth-update
+  command: pam-auth-update --package
+
+- name: restart ntp
+  service: name=ntp state=restarted

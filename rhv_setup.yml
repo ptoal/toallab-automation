@@ -1,0 +1,21 @@
+---
+- name: Create RHV/ovirt VLANs
+  hosts: rhv.lab.toal.ca
+  connection: local
+  vars:
+    # Hack to work around virtualenv python interpreter
+    ansible_python_interpreter: "{{ ansible_playbook_python }}"
+  tasks:
+    - ovirt_network:
+        auth: "{{ ovirt_auth }}"
+        fetch_nested: true
+        data_center: "{{ item.data_center }}"
+        name: "{{ item.name }}"
+        vlan_tag: "{{ item.vlan_tag }}"
+        vm_network: "{{ item.vm_network }}"
+        mtu: "{{ item.mtu }}"
+        description: "{{ item.description }}"
+      loop: "{{ ovirt_networks }}"
+      register: networkinfo
+
+    - debug: msg="{{networkinfo}}"

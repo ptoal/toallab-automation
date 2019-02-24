@@ -1,0 +1,3 @@
+---
+ipa_realm: "example.com"
+ipa_server: freeipa.example.com

@@ -1,5 +1,6 @@
 ---
 # Ensure that virtual guests have the guest tools installed.
+- block:
   - name: Guest Tools Repository
     rhsm_repository:
       name: rhel-7-server-rh-common-rpms
@@ -9,7 +10,7 @@
     yum:
       name: ovirt-guest-agent
       state: present
-    when: ansible_virtualization_type == "RHEV"
     notify: Ovirt Agent Restart
+  when: ansible_virtualization_type == "RHEV"
 
 

@@ -64,14 +64,13 @@
         memory: "{{ vm_memory }}"
         disks: "{{ vm_disks }}"
         cpu_cores: "{{ vm_cpu_cores }}"
-        operating_system: "{{ vm_os }}"
         cluster: "{{ vm_cluster }}"
+        operating_system: "{{ vm_os }}"
         type: server
         graphical_console:
           protocol:
             - spice
             - vnc
-        cluster: Default
         boot_devices:
           - hd
       async: 300

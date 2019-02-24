@@ -1,8 +1,12 @@
 # Toal Lab Site Playbook
-
-
 - name: Common Lab Machine Setup
   hosts: all
   become: true
   roles:
     - toal-common
+
+- name: Ansible Red Demo Environment
+  hosts: ansible-red
+  become: false
+  roles:
+    - lightbulb-ansiblered-deck  

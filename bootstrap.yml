@@ -1,0 +1,9 @@
+# Note: need to specify extra_vars, providing ansible_ssh_user, and ansible_ssh_pass
+- name: Set up IPA Client
+  hosts: lab-ipa-client
+  become: yes
+  roles:
+    - role: debian-freeipa-client
+      when: ansible_facts['os_family'] == "Debian"
+    - role: alvaroaleman.freeipa-client
+      when: ansible_facts['os_family'] == "RedHat"
