@@ -1,0 +1,14 @@
+---
+# tasks file for kickstart-rhv-template
+# 
+
+- name: Create Fresh oVirt/RHV VM
+  
+- name: Create Host in Satellite
+
+- name: Kickstart Host
+
+- name: Anonymize Host
+
+- name: Create Template
+

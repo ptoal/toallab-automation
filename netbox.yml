@@ -1,0 +1,23 @@
+plugin: netbox
+validate_certs: False
+config_context: True
+group_by:
+  - device_roles
+
+    #query_filters:
+    #  - role: core-switch
+    
+#query_filters:
+#  - role: network-edge-router
+
+# Query filters are passed directly as an argument to the fetching queries.
+# You can repeat tags in the query string.
+
+    #query_filters:
+    #  - role: server
+    #  - tag: web
+    #  - tag: production
+
+    #compose:
+    #  foo: last_updated
+    #  bar: display_name
