@@ -1,9 +1,26 @@
 # Toal Lab Site Playbook
 - name: Common Lab Machine Setup
-  hosts: all
+  hosts: all,!switch01
   become: true
   roles:
     - toal-common
+
+- name: Set Network OS from Netbox info.
+  gather_facts: no
+  hosts: switch01
+  tasks:
+    - name: Set network os type for Cisco
+      set_fact: ansible_network_os="ios"
+      when: "'Cisco IOS' in platforms"
+   
+- name: Configure infrastructure
+  hosts: switch01
+  become_method: enable
+  connection: network_cli
+  gather_facts: no
+
+  roles:
+    - toallab.infrastructure
 
 - name: Ansible Red Demo Environment
   hosts: ansible-red

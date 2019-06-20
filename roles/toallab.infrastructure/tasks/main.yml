@@ -1,0 +1,33 @@
+---
+# tasks file for toallab.infrastructure
+
+- name: Backup IOS Config
+  connection: network_cli
+  become: yes
+  ios_config:
+    backup: yes
+
+- name: Install base configuration
+  connection: network_cli
+  become: yes
+  ios_config:
+    lines:
+      - enable secret 5 $1$7h96$Q7sso70QqSgFIpY91SuQC0
+      - username ptoal privilege 15 secret 5 $1$j4aN$xbLbABGihOTnnHl5PFm4g1
+      - aaa new-model
+      - ip domain-name lan.toal.ca
+      - ip name-server 192.168.1.1
+      - no cdp run
+      - lldp run
+      - ip ssh authentication-retries 2
+      - ip ssh rsa keypair-name ssh2
+      - ip ssh version 2
+      - ntp server 0.ca.pool.ntp.org
+      - ntp server 0.pool.ntp.org
+      - ntp server ip 1.pool.ntp.org
+
+- name: Save changes
+  become: yes
+  connection: network_cli
+  ios_config:
+      save_when: changed
