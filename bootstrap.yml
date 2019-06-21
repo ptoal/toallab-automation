@@ -7,3 +7,9 @@
       when: ansible_facts['os_family'] == "Debian"
     - role: alvaroaleman.freeipa-client
       when: ansible_facts['os_family'] == "RedHat"
+
+- name: Set up Basic Lab Packages
+  hosts: all
+  become: yes
+  roles:
+    - role: toal-common
