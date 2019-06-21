@@ -13,4 +13,15 @@
     notify: Ovirt Agent Restart
   when: ansible_virtualization_type == "RHEV"
 
+- name: Install katello-agent on Satellite managed systems
+  yum:
+    name: katello-agent
+    state: present
+  when: foreman
+
+- name: Install insights-client on RHEL systems
+  yum:
+    name: insights-client
+    state: present
+  when: ansible_os_family == "RedHat"
 
