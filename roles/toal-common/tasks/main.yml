@@ -17,7 +17,7 @@
   yum:
     name: katello-agent
     state: present
-  when: foreman
+  when: foreman|bool
 
 - name: Install insights-client on RHEL systems
   yum:
