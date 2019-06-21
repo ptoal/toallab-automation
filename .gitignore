@@ -109,3 +109,4 @@ venv.bak/
 *.retry
 
 roles/toallab.infrastructure/backup/
+roles/lightbulb-ansiblered-deck
