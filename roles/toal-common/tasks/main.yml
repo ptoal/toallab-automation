@@ -13,6 +13,8 @@
     notify: Ovirt Agent Restart
   when: ansible_virtualization_type == "RHEV"
 
+- debug: msg={{foreman}}
+
 - name: Install katello-agent on Satellite managed systems
   yum:
     name: katello-agent
