@@ -34,5 +34,5 @@
   vars:
     nodejs_version: "8.x"
   roles:
-    - halkeye.nodejs
+    - ansible-role-nodejs
     - sage905.mineos
