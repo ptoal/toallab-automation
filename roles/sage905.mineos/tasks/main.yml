@@ -81,6 +81,14 @@
   command: /usr/games/minecraft/generate-sslcert.sh chdir=/usr/games/minecraft creates=/etc/ssl/certs/mineos.key
   when: "{{ mineos_generate_self_signed }}"
 
+- name: Get new nan
+  npm:
+      name: nan
+      global: true
+      state: present
+      production: true
+      version: "2.14.0"
+
 - name: Get Node Modules
   become: true
   become_user: minecraft
