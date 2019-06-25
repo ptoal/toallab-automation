@@ -1,0 +1,9 @@
+---
+# handlers file for sage905.mineos
+- name: Reload initctl
+  become: true
+  command: initctl reload-configuration
+
+- name: Restart mineos
+  become: true
+  service: name=mineos state=restarted

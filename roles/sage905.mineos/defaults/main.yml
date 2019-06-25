@@ -1,0 +1,9 @@
+---
+# defaults file for sage905.mineos
+mineos_cert_key: /etc/ssl/certs/mineos.key
+mineos_cert_pem: /etc/ssl/certs/mineos.pem
+mineos_generate_self_signed: true
+mineos_keep_updated: false
+mineos_http_port: 80
+mineos_https_port: 443
+mineos_use_https: true

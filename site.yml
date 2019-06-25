@@ -27,3 +27,8 @@
   become: false
   roles:
     - lightbulb-ansiblered-deck  
+
+- name: Minecraft Systems
+  hosts: tag_mineos
+  roles:
+    - sage905.mineos
