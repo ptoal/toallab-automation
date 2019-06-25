@@ -20,21 +20,21 @@
     - rdiff-backup
   when:  ansible_os_family == 'RedHat'
 
-- name: Create minecraft group
-  become: true
-  group: name=minecraft state=present system=yes
+# - name: Create minecraft group
+#   become: true
+#   group: name=minecraft state=present system=yes
 
-- name: Create minecraft user
-  become: true
-  user:
-   name: minecraft
-   comment: "Minecraft Server"
-   createhome: yes
-   system: yes
-   groups: minecraft
-   home: /var/games/minecraft
-   shell: /bin/bash
-   state: present
+# - name: Create minecraft user
+#   become: true
+#   user:
+#    name: minecraft
+#    comment: "Minecraft Server"
+#    createhome: yes
+#    system: yes
+#    groups: minecraft
+#    home: /var/games/minecraft
+#    shell: /bin/bash
+#    state: present
 
 - name: Create Directories
   become: true
