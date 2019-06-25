@@ -78,8 +78,11 @@
 
 - name: Generate self-signed certs
   become: true
-  command: /usr/games/minecraft/generate-sslcert.sh chdir=/usr/games/minecraft creates=/etc/ssl/certs/mineos.key
-  when: "{{ mineos_generate_self_signed }}"
+  command: /usr/games/minecraft/generate-sslcert.sh  
+  args:
+    chdir: /usr/games/minecraft 
+    creates: /etc/ssl/certs/mineos.key
+  
 
 - name: Get new nan
   npm:
