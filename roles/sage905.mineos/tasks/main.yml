@@ -7,17 +7,12 @@
 
 - name: Install MineOS Dependencies
   become: true
-  yum: name={{ item }} state=present enablerepo=epel
-  with_items:
-    - bind-utils
-    - screen
-    - git
-    - wget
-    - java-1.8.0-openjdk-headless.x86_64
-    - openssl
-    - openssl-devel
-    - rsync
-    - rdiff-backup
+  yum: 
+    name: ['bind-utils', 'screen',
+ 'git', 'wget', 'java-1.8.0-openjdk-headless.x86_64', 'openssl', 'openssl-devel', 'rsync', 'rdiff-backup']
+    state: present 
+    enablerepo: epel
+ 
   when:  ansible_os_family == 'RedHat'
 
 # - name: Create minecraft group
@@ -41,8 +36,9 @@
   become: true
   file: "{{ item }}"
   loop:
-    {name: /usr/games/minecraft, state: directory, owner: minecraft, group: minecraft, mode: 0755}
-    
+    - {name: /usr/games/minecraft, state: directory, owner: minecraft, group: minecraft, mode: 0755}
+    - {name: /var/games/minecraft, state: directory, owner: minecraft, group: minecraft, mode: 0755}
+
 - name: Allow group to access minecraft directory
   become: true
   file: name=/var/games/minecraft group=minecraft mode=0775
