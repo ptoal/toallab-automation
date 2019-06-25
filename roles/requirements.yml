@@ -2,5 +2,5 @@
 - src: https://github.com/ptoal/lightbulb-ansiblered-deck
 # Java
 - src: geerlingguy.java
-# Node.js
-- src: geerlingguy.nodejs
+# Node.js (Using this repo temporarily, as it fixes a package naming bug (See #95))
+- src: https://github.com/halkeye/ansible-role-nodejs.git
