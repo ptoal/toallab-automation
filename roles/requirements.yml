@@ -1,2 +1,4 @@
 # Ansible Red
 - src: https://github.com/ptoal/lightbulb-ansiblered-deck
+# Java
+- src: geerlingguy.java
