@@ -34,7 +34,12 @@
 
 - name: Create Directories
   become: true
-  file: "{{ item }}"
+  file: 
+    name: "{{ name }}"
+    state: "{{ state }}"
+    owner: "{{ owner }}"
+    group: "{{ group }}"
+    mode: "{{ mode }}"
   loop:
     - {name: /usr/games/minecraft, state: directory, owner: minecraft, group: minecraft, mode: 0755}
     - {name: /var/games/minecraft, state: directory, owner: minecraft, group: minecraft, mode: 0755}
