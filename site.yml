@@ -31,4 +31,5 @@
 - name: Minecraft Systems
   hosts: tag_mineos
   roles:
+    - geerlingguy.nodejs
     - sage905.mineos

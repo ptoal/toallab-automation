@@ -2,3 +2,5 @@
 - src: https://github.com/ptoal/lightbulb-ansiblered-deck
 # Java
 - src: geerlingguy.java
+# Node.js
+- src: geerlingguy.nodejs
