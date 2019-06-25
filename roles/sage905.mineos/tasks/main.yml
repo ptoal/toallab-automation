@@ -82,6 +82,7 @@
   args:
     chdir: /usr/games/minecraft 
     creates: /etc/ssl/certs/mineos.key
+  notify: Restart mineos
   
 
 - name: Get new nan
