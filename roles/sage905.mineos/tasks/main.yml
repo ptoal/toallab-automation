@@ -122,3 +122,11 @@
   file: src=/usr/games/minecraft/init/systemd_conf dest=/etc/systemd/system/mineos.service state=link
   notify: Restart mineos
   when: (ansible_os_family == "RedHat" or ansible and ansible_distribution_major_version == "7")
+
+- name: Open firewall
+  firewalld:
+      state: enabled
+      zone: public  
+      service: https
+      immediate: yes
+      permanent: true
