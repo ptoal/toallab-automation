@@ -1,6 +1,6 @@
 # Toal Lab Site Playbook
 - name: Common Lab Machine Setup
-  hosts: tag_ansible,!switch01
+  hosts: tag_ansible
   become: true
   roles:
     - toal-common
@@ -29,7 +29,7 @@
     - lightbulb-ansiblered-deck  
 
 - name: Minecraft Systems
-  hosts: tag_mineos
+  hosts: tag_mineos:&tag_ansible
   become: true
   vars:
     nodejs_version: "8.x"
