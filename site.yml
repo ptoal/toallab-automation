@@ -30,6 +30,8 @@
 
 - name: Minecraft Systems
   hosts: tag_mineos
+  vars:
+    nodejs_version: "8.x"
   roles:
     - geerlingguy.nodejs
     - sage905.mineos
