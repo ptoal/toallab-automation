@@ -30,6 +30,7 @@
 
 - name: Minecraft Systems
   hosts: tag_mineos
+  become: true
   vars:
     nodejs_version: "8.x"
   roles:
