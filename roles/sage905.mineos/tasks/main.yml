@@ -36,10 +36,13 @@
 #    shell: /bin/bash
 #    state: present
 
+
 - name: Create Directories
   become: true
-  file: name=/usr/games/minecraft state=directory owner=minecraft group=minecraft mode=0775
-
+  file: "{{ item }}"
+  loop:
+    {name: /usr/games/minecraft, state: directory, owner: minecraft, group: minecraft, mode: 0755}
+    
 - name: Allow group to access minecraft directory
   become: true
   file: name=/var/games/minecraft group=minecraft mode=0775
