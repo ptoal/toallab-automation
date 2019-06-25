@@ -34,5 +34,5 @@
   vars:
     nodejs_version: "8.x"
   roles:
-    - geerlingguy.nodejs
+    - halkeye.nodejs
     - sage905.mineos
