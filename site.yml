@@ -32,7 +32,7 @@
   hosts: tag_mineos:&tag_ansible
   become: true
   vars:
-    nodejs_version: "8.x"
+    nodejs_version: "9.x"
   roles:
     - ansible-role-nodejs
     - sage905.mineos
