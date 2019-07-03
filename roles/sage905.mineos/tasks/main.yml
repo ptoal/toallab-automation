@@ -9,7 +9,7 @@
   become: true
   yum: 
     name: ['bind-utils', 'screen',
- 'git', 'wget', 'java-1.8.0-openjdk-headless.x86_64', 'openssl', 'openssl-devel', 'rsync', 'rdiff-backup']
+ 'git', 'wget', 'java-1.8.0-openjdk-headless.x86_64', 'openssl', 'openssl-devel', 'rsync', 'rdiff-backup', 'pam-devel']
     state: present 
     enablerepo: epel
  
@@ -96,7 +96,20 @@
 - name: Get Node Modules
   become: true
   become_user: minecraft
-  npm: path=/usr/games/minecraft state=present production=true
+  npm: 
+    path: /usr/games/minecraft 
+    state: present 
+    production: true
+  notify: Restart mineos
+
+- name: Install PAM Module for MineOS Authentication
+  become: true
+  become_user: minecraft
+  npm: 
+    name: authenticate-pam
+    path: /usr/games/minecraft 
+    state: present 
+    production: true
   notify: Restart mineos
 
 - name: Link to executable
