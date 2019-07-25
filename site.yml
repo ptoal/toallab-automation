@@ -33,6 +33,8 @@
   become: true
   vars:
     nodejs_version: "8.x"
+    mineos_repo: "git@github.com:sage905/mineos-node.git"
+    mineos_version: "pam_auth"
   roles:
     - ansible-role-nodejs
     - sage905.mineos

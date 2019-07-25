@@ -7,3 +7,5 @@ mineos_keep_updated: false
 mineos_http_port: 80
 mineos_https_port: 443
 mineos_use_https: true
+mineos_version: HEAD
+mineos_repo: https://github.com/hexparrot/mineos-node.git
