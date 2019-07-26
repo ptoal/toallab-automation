@@ -24,7 +24,8 @@
       state: present
       backup: yes # not required. Create a backup file including the timestamp information so you can get the original file back if you somehow clobbered it incorrectly.
       create: no
-
+  notify: restart_sssd
+  
 # - name: Create minecraft group
 #   become: true
 #   group: name=minecraft state=present system=yes

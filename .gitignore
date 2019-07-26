@@ -111,3 +111,4 @@ venv.bak/
 roles/toallab.infrastructure/backup/
 roles/lightbulb-ansiblered-deck/
 
+.vscode/

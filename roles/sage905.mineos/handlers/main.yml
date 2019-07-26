@@ -6,4 +6,12 @@
 
 - name: Restart mineos
   become: true
-  service: name=mineos state=restarted
+  service: 
+    name: mineos 
+    state: restarted
+
+- name: restart_sssd
+  become: true
+  service:
+    name: sssd
+    state: restarted
