@@ -19,7 +19,8 @@
   ini_file:
       section: domain/idm.toal.ca
       path: /etc/sssd/sssd.conf   
-      value: enumerate=yes
+      option: enumerate
+      value: yes
       state: present
       backup: yes # not required. Create a backup file including the timestamp information so you can get the original file back if you somehow clobbered it incorrectly.
       create: no
