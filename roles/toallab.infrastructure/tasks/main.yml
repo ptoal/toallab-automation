@@ -12,8 +12,6 @@
   become: yes
   ios_config:
     lines:
-      - enable secret 5 $1$7h96$Q7sso70QqSgFIpY91SuQC0
-      - username ptoal privilege 15 secret 5 $1$j4aN$xbLbABGihOTnnHl5PFm4g1
       - aaa new-model
       - ip domain-name lan.toal.ca
       - ip name-server 192.168.1.1
