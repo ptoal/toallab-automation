@@ -183,6 +183,9 @@
         name: sos
         state: latest
 
+# TODO: set this in Administer -> Settings -> Puppet Puppet out of sync disabled = Yes
+# Description: Disable host configuration status turning to out of sync for Puppet after report does not arrive within configured interval
+
 # TODO: Make this work
 # For now:
 # hammer user-group create --admin yes --name satellite_admins

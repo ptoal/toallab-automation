@@ -1,6 +1,41 @@
 ---
+# Probably want to split this out into a proper certificate management role for Toal.ca
+- name: Request TLS Certificate from LetsEncrypt
+  hosts: rhv.mgmt.toal.ca
+  connection: local
+  gather_facts: false
+  # This doesn't belong here
+  vars:
+    acme_email: ptoal@takeflight.ca
+    challenge: dns-01
+    dns_provider: dme
+    domains:
+      - rhv.mgmt.toal.ca
+
+  pre_tasks:
+    - name: Ensure Let's Encrypt Account Exists
+      acme_account:
+          state: present
+          terms_agreed: true
+          allow_creation: true
+          contact:  
+            - mailto:ptoal@takeflight.ca 
+          account_key_content: "{{ acme_key }}"
+          acme_version: 2
+  roles:
+    - acme-certificate
+
+    
+# - name: Install custom CA Certificate in RHV-M
+#   hosts: rhv.lab.toal.ca
+  
+#   tasks:
+#     - name: Download LetsEncrypt Root/Intermediate Certificates
+      
+
+
 - name: Create RHV/ovirt VLANs
-  hosts: rhv.lab.toal.ca
+  hosts: rhv.mgmt.toal.ca
   connection: local
   vars:
     # Hack to work around virtualenv python interpreter
@@ -11,7 +46,7 @@
         fetch_nested: true
         data_center: "{{ item.data_center }}"
         name: "{{ item.name }}"
-        vlan_tag: "{{ item.vlan_tag }}"
+        vlan_tag: "{{ item.vlan_tag|default(omit) }}"
         vm_network: "{{ item.vm_network }}"
         mtu: "{{ item.mtu }}"
         description: "{{ item.description }}"
