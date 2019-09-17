@@ -126,3 +126,4 @@
       register: networkinfo
 
     - debug: msg="{{networkinfo}}"
+    
