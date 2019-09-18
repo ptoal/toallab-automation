@@ -4,14 +4,22 @@
   become: yes
   connection: network_cli
   gather_facts: no
+  vars: 
+    switch_port: Gigabit2/0/13
 
   tasks:
-   - name: Shut down port
-     ios_interface:
-         name: Gigabit2/0/13
-         enabled: False
+  - name: Shut down port
+    ios_interface:
+      name: "{{ switch_port }}"
+      enabled: False
+      state: down
 
-   - name: Bring up port
-     ios_interface:
-         name: Gigabit2/0/13
-         enabled: True
+  - name: Pause for 5 seconds
+    pause:
+        seconds: 5
+
+  - name: Bring up port
+    ios_interface:
+      name: "{{ switch_port }}"
+      enabled: True
+      state: up
