@@ -1,6 +1,7 @@
 - name: Reset Port
   hosts: switch01
   become_method: enable
+  become: yes
   connection: network_cli
   gather_facts: no
 
