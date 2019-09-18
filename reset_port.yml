@@ -23,5 +23,3 @@
     ios_interface:
       name: "{{ switch_port }}"
       enabled: True
-      state: up
-      delay: 20
