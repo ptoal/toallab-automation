@@ -1,0 +1,16 @@
+- name: Reset Port
+  hosts: switch01
+  become_method: enable
+  connection: network_cli
+  gather_facts: no
+
+  tasks:
+   - name: Shut down port
+     ios_interface:
+         name: Gigabit2/0/13
+         state: down
+
+   - name: Bring up port
+     ios_interface:
+         name: Gigabit2/0/13
+         state: up
