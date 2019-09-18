@@ -9,9 +9,11 @@
    - name: Shut down port
      ios_interface:
          name: Gigabit2/0/13
+         enabled: False
          state: down
 
    - name: Bring up port
      ios_interface:
          name: Gigabit2/0/13
+         enabled: True
          state: up
