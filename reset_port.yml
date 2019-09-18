@@ -13,6 +13,7 @@
       name: "{{ switch_port }}"
       enabled: False
       state: down
+      delay: 20
 
   - name: Pause for 5 seconds
     pause:
@@ -23,3 +24,4 @@
       name: "{{ switch_port }}"
       enabled: True
       state: up
+      delay: 20
