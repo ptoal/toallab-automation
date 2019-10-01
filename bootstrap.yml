@@ -15,5 +15,7 @@
     - role: toal-common
 
 - name: Show a message
-  debug:
-    msg: "Hi!"
+  hosts: all
+  tasks:
+  - debug:
+      msg: "Hi!"
