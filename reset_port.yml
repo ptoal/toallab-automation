@@ -8,6 +8,11 @@
     switch_port: GigabitEthernet2/0/13
 
   tasks:
+
+  - name: Simple Debug Task
+    debug:
+      msg: "Hello World"
+      
   - name: Shut down port
     ios_interface:
       name: "{{ switch_port }}"
