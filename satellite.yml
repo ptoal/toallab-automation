@@ -12,7 +12,7 @@
       
 #   tasks:
     # - name: Get first nfs server
-    #   set_fact: ks_nfs_server="{{ groups['nfs-server'][0] }}"
+    #   set_fact: ks_nfs_server="{{ groups['nfs_server'][0] }}"
     # - set_fact: ks_file="{{ hostvars[ks_nfs_server]['nfs_dir'] }}/{{ inventory_hostname }}.cfg"
 
     # - name: Copy ks file to builddir

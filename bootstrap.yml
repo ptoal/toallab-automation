@@ -1,6 +1,6 @@
 # Note: need to specify extra_vars, providing ansible_ssh_user, and ansible_ssh_pass
 - name: Set up IPA Client
-  hosts: lab-ipa-client
+  hosts: lab_ipa_client
   become: yes
   roles:
     - role: debian-freeipa-client

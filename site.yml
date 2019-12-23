@@ -23,7 +23,7 @@
     - toallab.infrastructure
 
 - name: Ansible Red Demo Environment
-  hosts: ansible-red
+  hosts: ansible_red
   become: false
   roles:
     - lightbulb-ansiblered-deck  

@@ -1,5 +1,17 @@
 ---
 # tasks file for sage905.mineos
+- name: Ensure extra repos are enabled
+  rhsm_repository:
+    name:
+     - "rhel-*-optional-rpms"
+     - "rhel-*-extras-rpms"
+    state: enabled
+
+- name: Ensure EPEL is available
+  yum:
+    name: https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
+    state: present
+    
 - name: Install Development Tools
   become: true
   yum: name="@Development tools" state=present
