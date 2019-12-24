@@ -1,0 +1,139 @@
+---
+# tasks file for sage905.mark2
+- name: Ensure extra repos are enabled
+  rhsm_repository:
+    name:
+     - "rhel-*-optional-rpms"
+     - "rhel-*-extras-rpms"
+    state: enabled
+
+- name: Ensure EPEL is available
+  yum:
+    name: https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
+    state: present
+
+- name: Install Development Tools
+  become: true
+  yum: name="@Development tools" state=present
+  when: ansible_os_family == 'RedHat'
+  
+- name: Ensure git is available
+  yum:
+    name: git
+    state: present
+
+# Not needed with IDM  
+# - name: Create minecraft group
+#   become: true
+#   group: 
+#     name: minecraft 
+#     state: present 
+#     system: yes
+
+# - name: Create minecraft user
+#   become: true
+#   user:
+#     name: minecraft
+#     comment: "Minecraft Server"
+#     createhome: yes
+#     system: yes
+#     groups: minecraft
+#     home: /var/games/minecraft
+#     shell: /bin/bash
+#     state: present
+
+
+- name: Create Directories
+  become: true
+  file: 
+    name: "{{ item.name }}"
+    state: "{{ item.state }}"
+    owner: "{{ item.owner }}"
+    group: "{{ item.group }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - {name: /usr/games/minecraft, state: directory, owner: minecraft, group: minecraft, mode: "0755"}
+    - {name: /var/games/minecraft, state: directory, owner: minecraft, group: minecraft, mode: "0755"}
+
+- name: Allow group to access minecraft directory
+  become: true
+  file: name=/var/games/minecraft group=minecraft mode=0775
+
+- name: Clone Mark2 git repo
+  become: true
+  become_user: minecraft
+  git: 
+    repo: "{{ mark2_repo }}"
+    version: "{{ mark2_version }}" 
+    dest: "/usr/games/minecraft"
+    update: "{{ mark2_keep_updated }}"
+  notify: Restart mark2
+
+- name: Set git core.filemode setting
+  become: true
+  become_user: minecraft
+  ini_file:
+    dest: /usr/games/minecraft/.git/config
+    section: core
+    option: filemode
+    value: false
+
+- name: Give minecraft group access to server dir
+  become: true
+  file: name=/var/games/minecraft/servers owner=minecraft group=minecraft mode=0775 state=directory
+
+- name: Python development tools available
+  become: true
+  yum:
+    name: 
+      - python2-pip 
+      - python-devel 
+    state: present
+  
+- name: Mark2 requirements installed
+  become: true
+  pip:
+    chdir: /usr/games/minecraft
+    requirements: /usr/games/minecraft/requirements.txt
+
+- name: Easy Install requirements
+  become: true
+  easy_install:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - psutil 
+    - urwid 
+    - feedparser
+
+- name: Link to executable
+  become: true
+  file: src=/usr/games/minecraft/mark2 dest=/usr/local/bin/mark2 state=link
+  notify: Restart mark2
+
+# - name: Install mineos config from distribution
+#   become: true
+#   template: src=mineos.conf dest=/etc/mineos.conf owner=root mode=0644
+#   notify: Restart mineos
+
+# - name: Install upstart config (RHEL <= 6)
+#   become: true
+#   copy: src=upstart_conf dest=/etc/init/mineos.conf
+#   notify:
+#     - Reload initctl
+#     - Restart mineos
+#   when: ansible_distribution == "Amazon" or (ansible_os_family == "RedHat" and ansible_distribution_major_version <= "6")
+
+# - name: Link systemd config (RHEL 7)
+#   become: true
+#   file: src=/usr/games/minecraft/init/systemd_conf dest=/etc/systemd/system/mineos.service state=link
+#   notify: Restart mineos
+#   when: (ansible_os_family == "RedHat" or ansible and ansible_distribution_major_version == "7")
+
+- name: Open firewall
+  firewalld:
+      state: enabled
+      zone: public  
+      port: 25565-25575/tcp
+      immediate: yes
+      permanent: true

@@ -28,8 +28,8 @@
   roles:
     - lightbulb-ansiblered-deck  
 
-- name: Minecraft Systems
-  hosts: tag_mineos:&tag_ansible
+- name: Minecraft Systems - MineOS
+  hosts: tag_mc_mineos:&tag_ansible
   become: true
   vars:
     nodejs_version: "8.x"
@@ -38,4 +38,10 @@
   roles:
     - ansible-role-nodejs
     - sage905.mineos
+
+- name: Minecraft Systems - Mark2
+  hosts: tag_mc_mark2:&tag_ansible
+  become: true
+  roles:
+    - sage905.mark2
 

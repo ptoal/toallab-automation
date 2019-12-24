@@ -13,9 +13,3 @@
   become: yes
   roles:
     - role: toal-common
-
-- name: Show a message
-  hosts: all
-  tasks:
-  - debug:
-      msg: "Hi!"
