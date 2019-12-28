@@ -17,31 +17,12 @@
   yum: name="@Development tools" state=present
   when: ansible_os_family == 'RedHat'
   
-- name: Ensure git is available
+- name: Ensure required packages are available
   yum:
-    name: git
+    name:
+      - git
+      - nano
     state: present
-
-# Not needed with IDM  
-# - name: Create minecraft group
-#   become: true
-#   group: 
-#     name: minecraft 
-#     state: present 
-#     system: yes
-
-# - name: Create minecraft user
-#   become: true
-#   user:
-#     name: minecraft
-#     comment: "Minecraft Server"
-#     createhome: yes
-#     system: yes
-#     groups: minecraft
-#     home: /var/games/minecraft
-#     shell: /bin/bash
-#     state: present
-
 
 - name: Create Directories
   become: true
@@ -52,16 +33,22 @@
     group: "{{ item.group }}"
     mode: "{{ item.mode }}"
   loop:
-    - {name: /usr/games/minecraft, state: directory, owner: minecraft, group: minecraft, mode: "0755"}
-    - {name: /var/games/minecraft, state: directory, owner: minecraft, group: minecraft, mode: "0755"}
+    - {name: /usr/games/minecraft, state: directory, owner: "{{ minecraft_user }}", group: "{{ minecraft_user }}", mode: "0755"}
+    - {name: /var/games/minecraft, state: directory, owner: "{{ minecraft_user }}", group: "{{ minecraft_user }}", mode: "0775"}
 
 - name: Allow group to access minecraft directory
   become: true
-  file: name=/var/games/minecraft group=minecraft mode=0775
+  file: name=/var/games/minecraft group={{ minecraft_user }} mode=0775
+
+- name: Set default editor to nano
+  copy:
+      dest: /etc/profile.d/nano.sh
+      content: 'export VISUAL="nano"\nexport EDITOR="nano"'
+      owner: root
 
 - name: Clone Mark2 git repo
   become: true
-  become_user: minecraft
+  become_user: "{{ minecraft_user }}"
   git: 
     repo: "{{ mark2_repo }}"
     version: "{{ mark2_version }}" 
@@ -71,7 +58,7 @@
 
 - name: Set git core.filemode setting
   become: true
-  become_user: minecraft
+  become_user: "{{ minecraft_user }}"
   ini_file:
     dest: /usr/games/minecraft/.git/config
     section: core
@@ -80,7 +67,7 @@
 
 - name: Give minecraft group access to server dir
   become: true
-  file: name=/var/games/minecraft/servers owner=minecraft group=minecraft mode=0775 state=directory
+  file: name=/var/games/minecraft/servers owner={{ minecraft_user }} group={{ minecraft_user }} mode=0775 state=directory
 
 - name: Python development tools available
   become: true
@@ -108,7 +95,7 @@
 
 - name: Link to executable
   become: true
-  file: src=/usr/games/minecraft/mark2 dest=/usr/local/bin/mark2 state=link
+  file: src=/usr/games/minecraft/mark2 dest=/usr/bin/mark2 state=link
   notify: Restart mark2
 
 # - name: Install mineos config from distribution

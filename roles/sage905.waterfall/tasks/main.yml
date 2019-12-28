@@ -1,0 +1,54 @@
+---
+# tasks file for sage905.waterfall
+- name: Tmux installed
+  yum:
+    name: tmux
+    state: latest
+    
+- name: Ensure Waterfall Directories exist
+  file:
+    name: "{{ item }}"
+    owner: "{{ minecraft_user }}"
+    group: "{{ minecraft_group }}"
+    state: directory
+  loop:
+    - /usr/games/waterfall
+    - /var/games/waterfall
+
+- name: Waterfall jar up to date
+  get_url:
+    url: "{{ waterfall_url }}"
+    dest: /usr/games/waterfall
+    owner: "{{ minecraft_user }}"
+    group: "{{ minecraft_group }}"
+  
+- name: Waterfall modules up to date
+  get_url:
+    url: "{{waterfall_module_url}}module/{{ item|regex_replace('_','-') }}/target/{{ item }}.jar"
+    dest: /usr/games/waterfall
+    owner: "{{ minecraft_user }}"
+    group: "{{ minecraft_group }}"
+  loop: "{{ waterfall_modules }}"
+
+- name: Waterfall scripts up to date
+  copy:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    owner: minecraft
+    group: minecraft
+    mode: 0755
+  loop:
+    - { src: run_waterfall.sh, dest: /usr/games/waterfall }
+    - { src: checkservers.sh, dest: /usr/games/waterfall }
+
+- name: Set up crontab
+  cron:
+    month: '*'
+    job: /usr/games/waterfall/checkservers.sh
+    user: minecraft
+    day: '*'
+    minute: '*'
+    name: waterfall_check
+    hour: '*'
+    state: present
+    weekday: '*'

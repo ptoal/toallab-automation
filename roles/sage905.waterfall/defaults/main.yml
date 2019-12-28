@@ -1,0 +1,13 @@
+---
+# defaults file for sage905.waterfall
+minecraft_user: minecraft
+minecraft_group: minecraft
+waterfall_url: "https://papermc.io/ci/job/Waterfall/lastSuccessfulBuild/artifact/Waterfall-Proxy/bootstrap/target/Waterfall.jar"
+waterfall_module_url: "https://papermc.io/ci/job/Waterfall/lastSuccessfulBuild/artifact/Waterfall-Proxy/"
+waterfall_modules:
+  - cmd_alert
+  - cmd_find
+  - cmd_list
+  - cmd_send
+  - cmd_server
+  - reconnect_yaml
