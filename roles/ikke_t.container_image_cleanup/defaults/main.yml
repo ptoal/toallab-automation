@@ -1,0 +1,10 @@
+---
+
+podman_prune_opts: "--all --force"
+docker_prune_opts: "--all --force"
+
+podman_path: /usr/bin/podman
+docker_path: /usr/bin/docker
+
+podman_prune_cronjob_special_time: daily
+docker_prune_cronjob_special_time: daily
