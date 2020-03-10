@@ -46,3 +46,44 @@
     - sage905.mark2
     - sage905.waterfall
 
+- name: Ensure Gitea is running on Zenyatta
+  become: yes
+  hosts: zenyatta.lab.toal.ca
+  vars:
+    container_state: running
+    container_name: gitea
+    container_image: gitea/gitea:latest
+    gitea_nfs_mountpoint: /mnt/gitea
+    gitea_nfs_src: nas.lab.toal.ca:/mnt/BIGPOOL/BackedUp/git
+    gitea_dir_owner: ptoal
+    gitea_dir_group: ptoal
+    container_run_args: >-
+      --rm
+      -p 3000:3000/tcp -p 3222:22/tcp
+      -v "{{ gitea_nfs_mountpoint }}:/data"
+      --hostname=gitea.mgmt.toal.ca
+      --memory=1024M
+    container_firewall_ports:
+      - 3000/tcp
+      - 3222/tcp
+  
+  tasks:
+  - name: Ensure container data mount points
+    tags: mount
+    file:
+      path: "{{ gitea_nfs_mountpoint }}"
+      state: directory
+
+  - name: ensure container NFS mounts from NAS
+    tags: [ mount, nfs ]
+    mount:
+      src: "{{ gitea_nfs_src }}"
+      path: "{{ gitea_nfs_mountpoint }}"
+      fstype: nfs
+      opts: rw,rsize=8192,wsize=8192,timeo=14,intr,vers=3
+      state: mounted
+
+  - name: ensure container state
+    tags: container
+    import_role:
+      name: ikke_t.podman_container_systemd

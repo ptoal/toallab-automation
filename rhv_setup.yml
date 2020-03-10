@@ -12,6 +12,8 @@
     root_certificate: https://letsencrypt.org/certs/trustid-x3-root.pem.txt
     domains:
       - rhv.mgmt.toal.ca
+  vars_files:
+    - /users/ptoal/.ansible/inventories/toallab/secrets.yml
 
   pre_tasks:
     - name: Ensure Let's Encrypt Account Exists
@@ -20,21 +22,21 @@
           acme_directory: "{{ acme_directory }}"
           terms_agreed: true
           allow_creation: true
-          contact:  
-            - mailto:ptoal@takeflight.ca 
+          contact:
+            - mailto:ptoal@takeflight.ca
           account_key_content: "{{ acme_key }}"
           acme_version: 2
   roles:
     - acme-certificate
 
-    
+
 - name: Install custom CA Certificate in RHV-M
   hosts: rhv.mgmt.toal.ca
   become: true
-  
+
   tasks:
     - name: Certificate trust in store
-      copy: 
+      copy:
         src: "{{ acme_rootchain_file }}"
         dest: /etc/pki/ca-trust/source/anchors/
       register: rootchain_result
@@ -44,9 +46,9 @@
       command: /usr/bin/update-ca-trust
       when: rootchain_result.changed
       notify: restart httpd
-      
+
     - name: CA Rootchain in Apache config
-      copy: 
+      copy:
         src: "{{ acme_rootchain_file }}"
         dest: /etc/pki/ovirt-engine/apache-ca.pem
         backup: yes
@@ -58,7 +60,7 @@
         dest: /etc/pki/ovirt-engine/keys/apache.key.nopass
         backup: yes
       notify: restart httpd
-    
+
     - name: Certificate installed
       copy:
         src: "{{ acme_cert_file }}"
@@ -75,7 +77,7 @@
       notify:
         - restart ovn
         - restart ovirt-engine
-      
+
     - name: Websocket Proxy configuration
       lineinfile:
           path: /etc/ovirt-engine/ovirt-websocket-proxy.conf.d/10-setup.conf
@@ -88,7 +90,7 @@
       notify:
         - restart ovn
         - restart ovirt-engine
-    
+
   handlers:
     - name: restart httpd
       service:
@@ -96,12 +98,12 @@
         state: restarted
 
     - name: restart ovn
-      service: 
+      service:
         name: ovirt-provider-ovn
         state: restarted
 
     - name: restart ovirt-engine
-      service: 
+      service:
         name: ovirt-engine
         state: restarted
 
@@ -126,4 +128,3 @@
       register: networkinfo
 
     - debug: msg="{{networkinfo}}"
-    
