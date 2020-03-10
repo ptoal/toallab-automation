@@ -12,8 +12,6 @@
     root_certificate: https://letsencrypt.org/certs/trustid-x3-root.pem.txt
     domains:
       - rhv.mgmt.toal.ca
-  vars_files:
-    - /users/ptoal/.ansible/inventories/toallab/secrets.yml
 
   pre_tasks:
     - name: Ensure Let's Encrypt Account Exists
