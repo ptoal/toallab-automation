@@ -108,8 +108,7 @@ venv.bak/
 # Ansible
 *.retry
 
-roles/toallab.infrastructure/backup/
-roles/lightbulb-ansiblered-deck/
+roles/
 
 .vscode/
 keys/
