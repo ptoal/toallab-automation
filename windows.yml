@@ -1,0 +1,45 @@
+- name: create a ovirt rhel template
+  hosts: all
+  gather_facts: False
+  connection: local
+  become: no
+
+  vars:
+    ansible_python_interpreter: "{{ ansible_playbook_python }}"
+    local_account_password: 'Executive41Headroom'
+    local_administrator_password: 'Executive41Headroom'
+    windows_distro_name: 2019_standard # this needs to be one of the standard values see 'os_short_names' var
+    template_vm_name: win2019_template
+    template_vm_root_disk_size: 30
+    template_vm_guest_id: windows_2019x64
+    template_vm_memory: 4096
+    template_timezone: 'GMT Standard Time'
+    template_vm_cpu: 4
+    template_vm_efi: false # you need to install efi file to use this, false should be fine in most cases
+    iso_file_name: '17763.737.190906-2324.rs5_release_svc_refresh_SERVER_EVAL_x64FRE_en-us_1.iso' # name of the iso file
+    iso_image_index: '1' # put index number here from the order inside the iso, for example 1 - standard, 2 - core etc
+    iso_product_key: ''
+    instance_wait_connection_timeout: 1800
+
+    virtio_iso_url: http://webserver.toal.ca/images/virtio-win.iso
+    vm_ansible_port: 5986
+    vm_ansible_winrm_transport: credssp
+    vm_upgrade_powershell: false # only needed for 2008 R2
+    install_updates: false # it will take longer to build with the updates, set to true if you want the updates
+
+    ovirt_datacenter: ToalLab
+    ovirt_cluster: Lab
+    ovirt_datastore: nfs_vms
+    ovirt_export_domain: nfs_vms
+    ovirt_iso_domain: isos
+
+    template_vm_network_name: sandbox
+    template_vm_ip_address: 192.168.18.41
+    template_vm_netmask: 255.255.240.0
+    template_vm_gateway: 192.168.16.1
+    template_vm_domain: sandbox.toal.ca
+    template_vm_dns_servers:
+    - 192.168.16.1
+
+  roles:
+    - oatakan.windows_ovirt_template

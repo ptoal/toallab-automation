@@ -7,3 +7,6 @@
   version: halkeye-patch-1
 # Windows Ovirt Template
 - name: oatakan.windows_ovirt_template
+- name: oatakan.windows_template_build
+- name: oatakan.windows_ovirt_guest_agent
+- name: oatakan.windows_virtio
