@@ -13,6 +13,7 @@
     template_vm_root_disk_size: 30
     template_vm_guest_id: windows_2019x64
     template_vm_memory: 4096
+    template_vm_host: orisa
     template_timezone: 'GMT Standard Time'
     template_vm_cpu: 4
     template_vm_efi: false # you need to install efi file to use this, false should be fine in most cases
@@ -25,13 +26,13 @@
     vm_ansible_port: 5986
     vm_ansible_winrm_transport: credssp
     vm_upgrade_powershell: false # only needed for 2008 R2
-    install_updates: false # it will take longer to build with the updates, set to true if you want the updates
+    install_updates: False
 
     ovirt_datacenter: ToalLab
     ovirt_cluster: Lab
-    ovirt_datastore: nfs_vms
-    ovirt_export_domain: nfs_vms
-    ovirt_iso_domain: isos
+    ovirt_datastore: ssdvdo0
+    ovirt_export_domain: ssdvdo0
+    ovirt_iso_domain: NAS_ISO
 
     template_vm_network_name: sandbox
     template_vm_ip_address: 192.168.18.41
