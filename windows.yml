@@ -32,6 +32,7 @@
     ovirt_cluster: Lab
     ovirt_datastore: ssdvdo0
     ovirt_export_domain: ssdvdo0
+    ovirt_data_domain: ssdvdo0
     ovirt_iso_domain: NAS_ISO
 
     template_vm_network_name: sandbox
