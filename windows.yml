@@ -1,5 +1,5 @@
 - name: create a ovirt rhel template
-  hosts: all
+  hosts: localhost
   gather_facts: False
   connection: local
   become: no
@@ -13,7 +13,6 @@
     template_vm_root_disk_size: 30
     template_vm_guest_id: windows_2019x64
     template_vm_memory: 4096
-    template_vm_host: orisa
     template_timezone: 'GMT Standard Time'
     template_vm_cpu: 4
     template_vm_efi: false # you need to install efi file to use this, false should be fine in most cases
