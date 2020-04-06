@@ -5,6 +5,8 @@
 # Node.js (Using this repo temporarily, as it fixes a package naming bug (See #95))
 - src: https://github.com/halkeye/ansible-role-nodejs
   version: halkeye-patch-1
+# Gitlab
+- name: geerlingguy.gitlab
 # Windows Ovirt Template
 - name: oatakan.windows_ovirt_template
 - name: oatakan.windows_template_build
