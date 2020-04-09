@@ -1,0 +1,1 @@
+- Replace alvaroaleman.freeipa-client with https://galaxy.ansible.com/freeipa/ansible_freeipa

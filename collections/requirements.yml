@@ -1,0 +1,4 @@
+---
+collections:
+  - name: davidban77.gns3
+    source: https://galaxy.ansible.com

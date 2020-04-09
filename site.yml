@@ -23,7 +23,7 @@
     - toallab.infrastructure
 
 - name: Include Minecraft tasks
-  include_tasks: minecraft.yml
+  include: minecraft.yml
 
 - name: Include Gitea tasks
-  include_tasks: gitea.yml
+  include: gitea.yml

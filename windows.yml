@@ -1,4 +1,4 @@
-- name: create a ovirt rhel template
+- name: create an ovirt rhel template
   hosts: localhost
   gather_facts: False
   connection: local
