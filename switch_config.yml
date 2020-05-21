@@ -1,0 +1,23 @@
+---
+- name: Collect Netbox Data
+  hosts: role_core-switch
+  gather_facts: false
+  collections:
+    - netbox.netbox
+  vars:
+    api_endpoint: "{{ lookup('env','NETBOX_API') }}"
+    api_token: "{{ lookup('env', 'NETBOX_TOKEN') }}"
+
+  tasks:
+  # - name: Gather Device Information
+  #   set_fact:
+  #     device_info: "{{ query('netbox.netbox.nb_lookup', 'devices', api_filter='name=' + inventory_hostname, api_endpoint=api_endpoint, token=api_token )[0] }}"
+  - debug:
+      var: interfaces
+
+  # - name: Obtain list of devices from Netbox
+  #   debug:
+  #     var: >
+  #       "Device {{ item.value.display_name }} (ID: {{ item.key }}) was
+  #        manufactured by {{ item.value.device_type.manufacturer.name }}"
+  #   loop: "{{ query('netbox.netbox.nb_lookup', 'devices', api_endpoint=api_endpoint, token=api_token ) }}"

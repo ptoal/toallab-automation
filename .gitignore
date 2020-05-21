@@ -112,3 +112,5 @@ roles/
 
 .vscode/
 keys/
+collections/ansible_collections/
+.vscode/

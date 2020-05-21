@@ -3,7 +3,17 @@ plugin: netbox.netbox.nb_inventory
 api_endpoint: http://netbox.mgmt.toal.ca
 validate_certs: True
 config_context: True
+interfaces: True
+services: True
+plurals: False
+
 group_by:
-  - device_roles
-    #query_filters:
-    #  - role: network-edge-router
+  - site
+  - tag  
+  - role
+  - platform
+  - cluster  
+
+
+#query_filters:
+#  - role: network-edge-router
