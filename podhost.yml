@@ -1,0 +1,15 @@
+- name: K8S installed and ready
+  hosts: k8s
+  become: yes
+
+  tasks:
+  - name: EPEL Repo enabled
+    yum:
+      name: epel-release
+      state: present
+
+  - name: Setting sebool container_manage_cgroup
+    seboolean:
+      name: container_manage_cgroup
+      state: yes
+      persistent: yes

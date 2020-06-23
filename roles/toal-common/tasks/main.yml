@@ -1,17 +1,42 @@
 ---
 # Ensure that virtual guests have the guest tools installed.
+# TODO: Refactor to make cleaner, and more DRY
 - block:
   - name: Guest Tools Repository
     rhsm_repository:
       name: rhel-7-server-rh-common-rpms
       state: present
+    when:
+     - ansible_os_family == "RedHat"
+     - ansible_distribution_major_version == '7'
+
+  - name: Guest Tools Repository
+    rhsm_repository:
+      name: rhel-8-for-x86_64-appstream-rpms
+      state: present
+    when:
+     - ansible_os_family == "RedHat"
+     - ansible_distribution_major_version == '8'
 
   - name: Install ovirt-guest-agent on RHV Guests
     yum:
       name: ovirt-guest-agent
       state: present
     notify: Ovirt Agent Restart
-  when: ansible_virtualization_type == "RHEV"
+    when:
+     - ansible_virtualization_type == "RHEV"
+     - ansible_os_family == "RedHat"
+     - ansible_distribution_major_version == '7'
+
+  - name: Install qemu-guest agent on RHEL8 Guest
+    yum:
+      name: qemu-guest-agent
+      state: present
+    notify: Qemu Agent Restart
+    when:
+     - ansible_virtualization_type == "RHEV"
+     - ansible_os_family == "RedHat"
+     - ansible_distribution_major_version == '8'
 
 - name: Install katello-agent on Satellite managed systems
   yum:
@@ -24,4 +49,3 @@
     name: insights-client
     state: present
   when: ansible_os_family == "RedHat"
-

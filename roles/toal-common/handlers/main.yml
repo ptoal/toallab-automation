@@ -6,3 +6,9 @@
       name: ovirt-guest-agent
       state: restarted
     when: ansible_virtualization_type == "RHEV"
+
+  - name: Qemu Agent Restart
+    service:
+      name: qemu-guest-agent
+      state: restarted
+    when: ansible_virtualization_type == "RHEV"

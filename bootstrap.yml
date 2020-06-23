@@ -2,10 +2,14 @@
 - name: Set up IPA Client
   hosts: lab_ipa_client
   become: yes
+  collections:
+    - freeipa.ansible_freeipa
+
   roles:
     - role: debian-freeipa-client
       when: ansible_facts['os_family'] == "Debian"
-    - role: alvaroaleman.freeipa-client
+    - role: ipaclient
+      state: present
       when: ansible_facts['os_family'] == "RedHat"
 
 - name: Set up Basic Lab Packages
