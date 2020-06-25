@@ -1,6 +1,6 @@
 # Toal Lab Site Playbook
 - name: Common Lab Machine Setup
-  hosts: tag_ansible
+  hosts: platform_linux
   become: true
   roles:
     - toal-common
