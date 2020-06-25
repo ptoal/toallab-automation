@@ -24,7 +24,6 @@
       state: present
     notify: Ovirt Agent Restart
     when:
-     - ansible_virtualization_type == "RHEV"
      - ansible_os_family == "RedHat"
      - ansible_distribution_major_version == '7'
 
@@ -34,9 +33,11 @@
       state: present
     notify: Qemu Agent Restart
     when:
-     - ansible_virtualization_type == "RHEV"
      - ansible_os_family == "RedHat"
      - ansible_distribution_major_version == '8'
+
+  when:
+    - ansible_virtualization_type == "RHEV"
 
 - name: Install katello-agent on Satellite managed systems
   yum:
@@ -49,3 +50,12 @@
     name: insights-client
     state: present
   when: ansible_os_family == "RedHat"
+
+- name: Performance Co-Pilot
+  yum:
+    name:
+     - pcp
+     - cockpit-pcp
+     - pcp-system-tools
+     - pcp-pmda-trace
+     - pcp-selinux

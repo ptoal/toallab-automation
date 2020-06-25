@@ -1,9 +1,16 @@
 # Note: need to specify extra_vars, providing ansible_ssh_user, and ansible_ssh_pass
 - name: Set up IPA Client
-  hosts: lab_ipa_client
+  hosts: tag_ipa_client
   become: yes
   collections:
     - freeipa.ansible_freeipa
+  pre_tasks:
+    - name: Attach subscriptions
+      command: '/usr/bin/subscription-manager attach'
+      register: result
+      changed_when:
+        - '"All installed products are covered by valid entitlements. No need to update subscriptions at this time." not in result.stdout'
+
 
   roles:
     - role: debian-freeipa-client
