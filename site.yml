@@ -23,10 +23,10 @@
     - toallab.infrastructure
 
 - name: Include Minecraft tasks
-  include: minecraft.yml
+  import_playbook: minecraft.yml
 
 - name: Include Gitea tasks
-  include: gitea.yml
+  import_playbook: gitea.yml
 
 # - name: Include Pod Host
 #   include: podhost.yml
