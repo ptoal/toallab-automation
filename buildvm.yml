@@ -1,0 +1,118 @@
+# Playbook to build new VMs in RHV Cluster
+# Currently only builds RHEL VMs
+- name: Create VMs
+  hosts: cluster_ToalLabRHV
+  connection: local
+  gather_facts: no
+  collections:
+    - netbox.netbox
+  vars:
+    # Workaround to get correct venv python interpreter
+    ansible_python_interpreter: "{{ ansible_playbook_python }}"
+
+  # Never run this, unless specifically enabled
+  # tags:
+  #  - never
+  #  - rebuild
+
+  tasks:
+    - name: Basic Disk Profile
+      set_fact:
+        vm_disks:
+        -  name: '{{ inventory_hostname }}_boot'
+           bootable: true
+           sparse: true
+           descr: '{{ inventory_hostname }} Boot / Root disk'
+           interface: virtio
+           size: '{{ disk|default(40) }}'
+           state: present
+           storage_domain: 'ssdvdo0'
+           activate: true
+      when: vm_disks is not defined
+
+    - name: Create VM Disks
+      ovirt_disk:
+        auth: '{{ ovirt_auth }}'
+        name: '{{ item.name }}'
+        description: '{{ item.descr }}'
+        interface: '{{ item.interface }}'
+        size: '{{ item.size }}'
+        state: '{{ item.state }}'
+        sparse: '{{ item.sparse }}'
+        wait: true
+        storage_domain: '{{ item.storage_domain }}'
+      async: 300
+      poll: 15
+      loop: '{{ vm_disks }}'
+
+
+    - set_fact:
+        nb_query_filter: "slug={{ platform }}"
+    - debug: msg='{{ query("netbox.netbox.nb_lookup", "platforms", api_filter=nb_query_filter, api_endpoint=netbox_api, token=netbox_token)[0].value.name }}'
+
+    - name: Create VM in RHV
+      ovirt_vm:
+        auth: '{{ ovirt_auth }}'
+        name: '{{ inventory_hostname }}'
+        state: present
+        memory: '{{ memory }}MiB'
+        memory_guaranteed: '{{ (memory / 2)|int }}MiB'
+        disks: '{{ vm_disks }}'
+        cpu_cores: '{{ vcpus }}'
+        cluster: '{{ cluster }}'
+        # Damn... This is ugly
+        operating_system: '{{ query("netbox.netbox.nb_lookup", "platforms", api_filter=nb_query_filter, api_endpoint=netbox_api, token=netbox_token)[0].value.name }}'
+        type: server
+        graphical_console:
+          protocol:
+            - vnc
+            - spice
+        boot_devices:
+          - hd
+      async: 300
+      poll: 15
+
+    - name: Assign NIC
+      ovirt_nic:
+        auth: '{{ ovirt_auth }}'
+        interface: virtio
+        mac_address: '{{ item.mac_address|default(omit) }}'
+        name: '{{ item.name }}'
+        profile: ovirtmgmt
+        network: '{{ item.untagged_vlan.name }}' # This is fragile
+        state: '{{ (item.enabled == True) |ternary("plugged","unplugged") }}'
+        linked: yes
+        vm: '{{ inventory_hostname }}'
+      loop: '{{ interfaces }}'
+
+  handlers:
+    - name: PXE Boot
+      ovirt_vm:
+        auth: "{{ ovirt_auth }}"
+        name: "{{ inventory_hostname }}"
+        boot_devices:
+         - network
+        state: running
+      register: vm_build_result
+
+- name: Ensure VM is running and reachable
+  hosts: cluster_ToalLabRHV
+  gather_facts: no
+  connection: local
+  vars:
+    # Hack to work around virtualenv python interpreter
+    ansible_python_interpreter: "{{ ansible_playbook_python }}"
+
+  tasks:
+    - name: VM is running
+      ovirt_vm:
+          auth: "{{ ovirt_auth }}"
+          name: "{{ inventory_hostname }}"
+          state: running
+          boot_devices:
+          - hd
+
+    - name: Wait for SSH to be ready
+      wait_for_connection:
+        timeout: 1800
+        sleep: 5

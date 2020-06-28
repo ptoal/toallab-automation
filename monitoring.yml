@@ -1,15 +1,15 @@
 ---
 - name: Prometheus
-  hosts: podhost1.mgmt.toal.ca # Hard-coded for now
+  hosts: monitor.mgmt.toal.ca # Hard-coded for now
   become: yes
   vars:
     container_image: prom/prometheus
     container_name: prometheus
     container_state: running
     container_firewall_ports:
-      - 9090/tcp
+      - 8090/tcp
     container_run_args: >-
-      -p 9090:9090
+      -p 8090:8090
       -v /home/prometheus/etc:/etc/prometheus:Z
       -v /home/prometheus/data:/prometheus:Z
       -v /home/prometheus/console_libraries:/usr/share/prometheus/console_libraries:Z
@@ -29,9 +29,15 @@
         - /home/prometheus/data
         - /home/prometheus/console_libraries
         - /home/prometheus/console_template
+  post_tasks:
+    - name: Firewall
+      firewalld:
+          state: enabled # required. choices: enabled;disabled;present;absent. Enable or disable a setting. For ports: Should this port accept(enabled) or reject(disabled) connections. The states "present" and "absent" can only be used in zone level operations (i.e. when no other parameters but zone and state are set).
+          permanent: true
+          port: 9090/tcp
 
 - name: Grafana
-  hosts: podhost1.mgmt.toal.ca # Hard-coded for now
+  hosts: monitor.mgmt.toal.ca # Hard-coded for now
   become: yes
   vars:
     container_image: grafana/grafana
@@ -41,5 +47,21 @@
       - 3000/tcp
     container_run_args: >-
       -p 3000:3000
+      -v /home/grafana/data:/var/lib/grafana:Z
+  pre_tasks:
+    - name: Directories exist
+      file:
+        path: '{{ item }}'
+        state: directory
+        owner: nobody
+        group: nobody
+      loop:
+        - /home/grafana/data
   roles:
     - ikke_t.podman_container_systemd
+  post_tasks:
+    - name: Firewall
+      firewalld:
+          state: enabled # required. choices: enabled;disabled;present;absent. Enable or disable a setting. For ports: Should this port accept(enabled) or reject(disabled) connections. The states "present" and "absent" can only be used in zone level operations (i.e. when no other parameters but zone and state are set).
+          permanent: true
+          port: 3000/tcp

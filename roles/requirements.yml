@@ -14,3 +14,7 @@
 - name: oatakan.windows_virtio
 - name: ikke_t.podman_container_systemd
 - name: ikke_t.container_image_cleanup
+
+# Infra
+- name: bertvv.bind
+- name: bertvv.dhcp  
