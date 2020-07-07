@@ -1,6 +1,15 @@
 # Toal Lab Site Playbook
+- name: Set up Network interfaces
+  hosts: all
+  gather_facts: true
+  become: true
+
+  roles:
+    - name: linux-system-roles.network
+      when: network_connections is defined
+
 - name: Common Lab Machine Setup
-  hosts: platform_linux
+  hosts: platform_linux,platform_fedora_linux
   become: true
   roles:
     - toal-common

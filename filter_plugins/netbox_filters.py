@@ -1,7 +1,7 @@
 # I started this to create a filter that would translate netbox to linux-system-roles/network.
 
 from ansible.utils.display import Display
-
+from ansible.parsing.yaml import dumper
 display = Display()
 
 def get_type(intf_type):
@@ -16,7 +16,6 @@ def get_type(intf_type):
 
 
 def translate_interface(interface):
-  display.vv(interface)
 
   lsrint = {
     'name': interface['name'],

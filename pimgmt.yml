@@ -1,23 +1,6 @@
 ---
 # Configure a Raspberry Pi running Fedora 32+ for Management functions.
-- name: Configure interfaces
-  hosts: pimgmt
-  gather_facts: false
-  connection: local
-  vars:
-    network_provider: nm
 
-  tasks:
-    - set_fact:
-        network_connections: >-
-          {{ network_connections|default([]) + [{
-            'name':  item.name,
-            'state': item.enabled |ternary('up','down')
-          }] }}
-      loop: "{{ interfaces }}"
-
-    - debug:
-        msg: "Connections = {{ network_connections }}"
 
 # - name: Set Up DHCP System
 #   hosts: dhcp-server
