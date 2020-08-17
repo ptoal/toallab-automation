@@ -1,0 +1,7 @@
+# SPDX-License-Identifier: BSD-3-Clause
+---
+- include: get-profile_stat.yml
+- name: "assert that profile '{{ profile }}' is present"
+  assert:
+    that: profile_stat.stat.exists
+    msg: "profile {{ profile_path }} does not exist"

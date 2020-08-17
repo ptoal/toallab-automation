@@ -1,0 +1,40 @@
+<section id="PlaybookTasks">
+<center><h2>PLAYBOOK TASKS</h2></center>
+
+<div class="terminal space shadow">
+    <div class="top">
+        <div class="title">Ansible Terminal</div>
+    </div>
+    <pre class="bodymw">
+- name: Ensure apache is installed and started
+  hosts: web
+  become: yes
+  vars:
+    http_port: 80
+    http_docroot: /var/www/gokev.com
+
+  tasks:
+  - name: Ensure latest httpd package is present
+    <mark>yum:</mark>
+      <mark>name: httpd</mark>
+      <mark>state: latest</mark>
+
+  - name: Verify correct config file is present
+    <mark>template:</mark>
+      <mark>src: templates/httpd.conf.j2</mark>
+      <mark>dest: /etc/httpd/conf/httpd.conf</mark>
+
+  - name: Ensure httpd is started
+    <mark>service:</mark>
+      <mark>name: httpd</mark>
+      <mark>state: started</mark>
+    </pre>
+</div>
+
+
+          <aside class="notes">
+            <p>Here we see modules, such as yum, being applied to a to perform a unit of automation such as to assure the latest httpd package is present on a host.</p>
+          </aside>
+        </section>
+        
+

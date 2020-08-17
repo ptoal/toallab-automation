@@ -1,0 +1,25 @@
+<section id="ModuleDoc-CLI-List">
+  <h2>Modules Documentation</h2>
+<p>Returns a list of literally every module available on the system</p>
+
+<div class="terminal space shadow">
+    <div class="top">
+        <div class="title">Ansible Terminal</div>
+    </div>
+    <pre class="bodymw">
+<font color="silver"># List out all modules installed -- returns MANY lines</font>
+<font color="gray"><?=$terminal_prompt?></font> ansible-doc -l
+
+copy			Copies files to remote...
+stat			Retrieve file or file ...
+synchronize		A wrapper around rsync...
+template		Templates a file out t...
+vmware_guest		Manages virtual machin...
+yum			Manages packages with ...
+
+<font color="#FF00FF">Many, many lines have been truncated.  This is a very small sample
+of the incredibly long list of modules.</font>
+    </pre>
+</div>
+
+</section>

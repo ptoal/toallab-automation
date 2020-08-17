@@ -1,0 +1,20 @@
+---
+
+- name: Install 7-zip
+  win_chocolatey:
+    name: 7zip
+    state: present
+
+- name: Ensure temp directory exists for iso
+  win_file:
+    path: '{{ ansible_env.TEMP }}\virtio_iso_extract'
+    state: directory
+
+- name: Extract iso
+  win_shell: >
+    7z.exe x -y '{{ ansible_env.TEMP }}\{{ virtio_win_iso_name }}' -o'{{ ansible_env.TEMP }}\virtio_iso_extract'
+
+- name: Remove 7-zip
+  win_chocolatey:
+    name: 7zip
+    state: absent

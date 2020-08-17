@@ -1,0 +1,23 @@
+---
+
+- name: Download {{ virtio_win_iso_name }}
+  win_get_url:
+    url: '{{ virtio_win_iso_url }}'
+    force: false
+    dest: '{{ ansible_env.TEMP }}\{{ virtio_win_iso_name }}'
+  notify:
+    - Delete downloaded
+
+- name: Mount {{ virtio_win_iso_name }}
+  win_disk_image:
+    image_path: '{{ ansible_env.TEMP }}\{{ virtio_win_iso_name }}'
+  register: win_disk_image
+  until: win_disk_image is success
+  delay: 3
+  retries: 5
+  notify:
+    - Unmount
+  when: ('Windows Server 2008' not in ansible_distribution)
+
+- include_tasks: extract_iso.yml
+  when: ('Windows Server 2008' in ansible_distribution)

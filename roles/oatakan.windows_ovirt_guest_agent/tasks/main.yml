@@ -1,0 +1,7 @@
+---
+
+- name: include distribution task
+  include_tasks: "{{ ansible_os_family }}.yml"
+
+- name: force all notified handlers to run here
+  meta: flush_handlers

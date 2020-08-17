@@ -1,0 +1,7 @@
+---
+
+- name: restart Ovirt Guest Agent
+  service: name={{ ovirt_guest_agent_service_name }} state=restarted
+
+- name: enabled Ovirt Guest Agent
+  service: name={{ ovirt_guest_agent_service_name }} enabled=yes

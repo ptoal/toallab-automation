@@ -1,0 +1,30 @@
+---
+- block:
+    - name: create temporary directory
+      file:
+        path: "{{ temp_directory }}/ks_iso"
+        state: directory
+
+    - name: create Autounattend.xml file
+      template:
+        src: "{{ windows_sysprep_template_folder }}/Autounattend.xml.j2"
+        dest: "{{ temp_directory }}/ks_iso/Autounattend.xml"
+
+    - name: include virtio drivers
+      include_tasks: virtio_drivers.yml
+
+    - name: create iso
+      command: mkisofs -V ADDISO -r -iso-level 4 -o {{ playbook_dir }}/{{ temp_directory }}/windows_{{ windows_distro_name }}_autounattend_autogen.iso .
+      args:
+        chdir: "{{ playbook_dir }}/{{ temp_directory }}/ks_iso"
+
+    - include_tasks: datastore_upload.yml
+  always:
+    - name: remove temporary files
+      file:
+        path: "{{ temp_directory }}/{{ item }}"
+        state: absent
+      loop:
+        - windows_{{ windows_distro_name }}_autounattend_autogen.iso
+        - virtio_win.iso
+        - ks_iso/

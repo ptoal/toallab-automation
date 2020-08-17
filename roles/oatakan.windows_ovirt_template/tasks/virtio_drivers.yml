@@ -1,0 +1,40 @@
+---
+
+- name: download virtio win iso file
+  get_url:
+    url: "{{ virtio_iso_url }}"
+    dest: "{{ temp_directory }}/virtio_win.iso"
+  register: download_virtio_iso
+  until: download_virtio_iso is success
+  delay: 3
+  retries: 5
+
+- name: set list of directories to copy
+  set_fact:
+    virtio_iso_list_of_directories_to_extract:
+      - /viostor/{{ os_short_names[windows_distro_name] | default('2k16') }}/amd64
+      - /NetKVM/{{ os_short_names[windows_distro_name] | default('2k16') }}/amd64
+
+- name: get a list of files from template iso
+  shell: >
+    set -o pipefail &&
+    isoinfo -f -R -i {{ playbook_dir }}/{{ temp_directory }}/virtio_win.iso |
+    grep -E "^{{ virtio_iso_list_of_directories_to_extract | join('|^') }}"
+  changed_when: False
+  register: virtio_iso_list_of_files
+
+- name: copy files from virtio iso to target
+  shell: |
+    set -o pipefail &&
+    isoinfo -f -R -i {{ playbook_dir }}/{{ temp_directory }}/virtio_win.iso |\
+    grep -E "^{{ virtio_iso_list_of_directories_to_extract | join('|^') }}" | while read line; do
+      d=$(dirname $line)
+      od=".${d}"
+      [ -f $od ] && rm -f $od
+      [ -d $od ] || mkdir -p $od
+      [ -d ".${line}" ] || isoinfo -R -i \
+      {{ playbook_dir }}/{{ temp_directory }}/virtio_win.iso -x $line > ".${line}"
+    done
+  changed_when: True
+  args:
+    chdir: "{{ playbook_dir }}/{{ temp_directory }}/ks_iso"

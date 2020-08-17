@@ -1,0 +1,10 @@
+---
+
+- name: install Ovirt Guest Agent
+  become: true
+  package:
+    name: "{{ item }}"
+  with_items: "{{ ovirt_package }}"
+  notify:
+    - enabled Ovirt Guest Agent
+    - restart Ovirt Guest Agent

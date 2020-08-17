@@ -1,0 +1,43 @@
+        <section data-state="cover" id="GoodByeNow">
+          <p class="ans-logo">
+            <img src="<?=$workshop_image?>" height="250"><br>
+            <img src="images/ansible-wordmark-white.svg" width="260" alt="" />
+          </p>
+          <p>Thank you for attending<br>
+          <h2><?=$workshop_name?></h2>
+          <p><?=$workshop_presenter?><br>
+          <?=$workshop_title?><br>
+          <?=$workshop_message?></p>
+        </section>
+
+
+
+      </div>
+    </div>
+
+    <script src="js/head.min.js"></script>
+    <script src="js/reveal.js"></script>
+
+    <script>
+      // More info https://github.com/hakimel/reveal.js#configuration
+      Reveal.initialize({
+        history: true,
+        width: "85%",
+        height: "90%",
+        transition: "fade",
+
+        // More info https://github.com/hakimel/reveal.js#dependencies
+        // Notes plugin must remain local for now.
+        // See https://github.com/ansible/lightbulb/issues/125
+        dependencies: [
+          { src: 'js/marked.js' },
+          { src: 'js/markdown.js' },
+          { src: 'js/notes.js', async: true },
+          { src: 'js/prism.min.js'},
+          { src: 'js/prism-yaml.min.js'}
+          //{ src: 'https://cdnjs.cloudflare.com/ajax/libs/reveal.js/3.4.1/plugin/highlight/highlight.js', async: true, callback: function() { hljs.initHighlightingOnLoad(); } }
+        ]
+      });
+    </script>
+  </body>
+</html>

@@ -108,7 +108,6 @@ venv.bak/
 # Ansible
 *.retry
 
-roles/
 
 .vscode/
 keys/

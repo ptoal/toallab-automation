@@ -1,0 +1,33 @@
+<section id="PlaybookLoops">
+<center><h2>WORKING WITH LOOPS</h2>
+<p>Loops can do one task on multiple things: create a lot of users, install a lot of packages, or repeat a polling step until a certain result is reached.</p>
+</center>
+
+<div class="terminal space shadow">
+    <div class="top">
+        <div class="title">Ansible Terminal</div>
+    </div>
+    <pre class="bodylw">
+- yum:
+    name: <mark>&quot;{{ item }}&quot;</mark>
+    state: latest
+  <mark>with_items:</mark>
+  <mark>- httpd</mark>
+  <mark>- mysql-server</mark>
+  <mark>- php56-mysqlnd</mark>
+  <mark>- php56-common</mark>
+  <mark>- php56-gd</mark>
+  <mark>- php56-soap</mark>
+  <mark>- php56-xml</mark>
+    </pre>
+</div>
+
+
+
+            <aside class="notes">
+              <p>This example demonstrates a basic loop with <code>with_items</code>. The loop sets a variable called &quot;item&quot;, a template variable courtesy of the embedded Jinja2 template engine, with the list value that is in context.</p>
+              <p>There are many different and specialized types of task loops to work with. See the <a href="http://docs.ansible.com/ansible/playbooks_loops.html">Loops documentation</a> to go deeper.</p>
+            </aside>
+          </section>
+          
+

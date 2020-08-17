@@ -1,0 +1,140 @@
+<section id="ModuleDoc-CLI-ExampleScroll">
+  <h2>Modules Documentation</h2>
+<p>Also displays usable copy / paste examples of working functional tasks with this module.</p>
+
+<div class="terminal space shadow" onclick="scrollDiv_init('AnsibleDocsExamples','40'); this.onclick = null;" style="cursor: pointer;">
+    <div class="top">
+        <div class="title">
+       	 <a href="javascript:pauseDiv()" style="none; cursor: pointer;">Ansible Terminal</a>
+       	</div>
+    </div>
+    <pre class="bodymw">
+<font color="gray"><?=$terminal_prompt?></font> ansible-doc copy
+<div id="AnsibleDocsExamples" style="overflow:auto;width:auto;height:700px">
+
+<font color="#FF00FF">EXAMPLES:</font>
+
+<mark>- name: example copying file with owner and permissions								</mark>
+  copy:
+    src: /srv/myfiles/foo.conf
+    dest: /etc/foo.conf
+    owner: foo
+    group: foo
+    mode: 0644
+
+<mark>- name: The same example as above, but using a symbolic mode equivalent to 0644								</mark>
+  copy:
+    src: /srv/myfiles/foo.conf
+    dest: /etc/foo.conf
+    owner: foo
+    group: foo
+    mode: u=rw,g=r,o=r
+
+<mark>- name: Another symbolic mode example, adding some permissions and removing others								</mark>
+  copy:
+    src: /srv/myfiles/foo.conf
+    dest: /etc/foo.conf
+    owner: foo
+    group: foo
+    mode: u+rw,g-wx,o-rwx
+
+<mark>- name: Copy a new "ntp.conf file into place, backing up the original if it differs from the...									</mark>
+  copy:
+    src: /mine/ntp.conf
+    dest: /etc/ntp.conf
+    owner: root
+    group: root
+    mode: 0644
+    backup: yes
+
+<mark>- name: Copy a new "sudoers" file into place, after passing validation with visudo								</mark>
+  copy:
+    src: /mine/sudoers
+    dest: /etc/sudoers
+    validate: /usr/sbin/visudo -cf %s
+
+<mark>- name: Copy a "sudoers" file on the remote machine for editing								</mark>
+  copy:
+    src: /etc/sudoers
+    dest: /etc/sudoers.edit
+    remote_src: yes
+    validate: /usr/sbin/visudo -cf %s
+
+<mark>- name: Copy using the 'content' for inline data								</mark>
+  copy:
+    content: '# This file was moved to /etc/other.conf'
+    dest: /etc/mine.conf'
+
+<font color="#FF00FF">RETURN VALUES:</font>
+
+
+dest:
+    description: destination file/path
+    returned: success
+    type: string
+    sample: /path/to/file.txt
+src:
+    description: source file used for the copy on the target machine
+    returned: changed
+    type: string
+    sample: /home/httpd/.ansible/tmp/ansible-tmp-1423796390.97-147729857856000/source
+md5sum:
+    description: md5 checksum of the file after running copy
+    returned: when supported
+    type: string
+    sample: 2a5aeecc61dc98c4d780b14b330e3282
+checksum:
+    description: sha1 checksum of the file after running copy
+    returned: success
+    type: string
+    sample: 6e642bb8dd5c2e027bf21dd923337cbb4214f827
+backup_file:
+    description: name of backup file created
+    returned: changed and if backup=yes
+    type: string
+    sample: /path/to/file.txt.2015-02-12@22:09~
+gid:
+    description: group id of the file, after execution
+    returned: success
+    type: int
+    sample: 100
+group:
+    description: group of the file, after execution
+    returned: success
+    type: string
+    sample: httpd
+owner:
+    description: owner of the file, after execution
+    returned: success
+    type: string
+    sample: httpd
+uid:
+    description: owner id of the file, after execution
+    returned: success
+    type: int
+    sample: 100
+mode:
+    description: permissions of the target, after execution
+    returned: success
+    type: string
+    sample: 0644
+size:
+    description: size of the target, after execution
+    returned: success
+    type: int
+    sample: 1220
+state:
+    description: state of the target, after execution
+    returned: success
+    type: string
+    sample: file
+	</div>
+    </pre>
+</div>
+
+
+  <aside class="notes">
+	<p><b>TO Make This List SCROLL</b>, click anywhere on the terminal window</p>
+	<p><b>TO Make This List STOP</b>, click the "Ansible Terminal" text on top of the console</p>
+  </aside>
+</section>

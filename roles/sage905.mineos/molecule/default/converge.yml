@@ -1,0 +1,7 @@
+---
+- name: Converge
+  hosts: all
+  tasks:
+    - name: "Include sage905.mineos"
+      include_role:
+        name: "sage905.mineos"

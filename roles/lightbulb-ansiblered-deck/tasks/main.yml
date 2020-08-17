@@ -1,0 +1,80 @@
+---
+# tasks file for ansiblered-deck-ansible---
+- name: Assure PHP is installed for deck and dynamic content
+  yum:
+    name: php
+    state: latest
+
+- name: Assure our preferences files directory exists
+  file:
+    path: "{{ workshop_web_path }}/deck-ansible/prefs/"
+    state: directory
+
+- name: deploy the PHP default preferences file template for the slide deck
+  template:
+    src: templates/deck-ansible_prefs_default.prefs.php
+    dest: "{{ workshop_web_path }}/deck-ansible/prefs/default.prefs.php"
+    mode: 0644
+    backup: yes
+
+- name: synchronize html basics deck
+  synchronize:
+    src: files/deck-ansible/
+    dest: "{{ workshop_web_path }}/deck-ansible/"
+    delete: yes
+    recursive: yes
+    rsync_opts:
+      - "--no-motd"
+      - "--exclude=prefs/default.prefs.php"
+
+### Ansible SELinux module does not appear to work recursively so we use ugly raw
+- name: "Set selinux context recursively httpd_sys_rw_content_t {{ workshop_web_path }}"
+  shell: "chcon -R -t httpd_sys_rw_content_t {{ workshop_web_path }}"
+  changed_when: no
+  failed_when: no
+
+
+### The optional PHP redirect will go in the {{ workshop_web_path }} path and redirect to the PHP deck dir with tag:  phpredirect
+- name: Copy index.php to root dir
+  template:
+    src: templates/index_redirect.php
+    dest: "{{ workshop_web_path }}/index.php"
+    owner: root
+    group: wheel
+    mode: 0644
+  tags: [ 'never', 'phpredirect' ]
+
+### The optional PHP daemon to run this without apache will only install explicityly with tag:  phpdaemon
+- name: Copy PHP systemd service file
+  template:
+    src: templates/ansible-php-deck.service
+    dest: /usr/lib/systemd/system/ansible-php-deck.service
+    owner: root
+    group: wheel
+    mode: 0644
+  tags: [ 'never', 'phpdaemon' ]
+
+- name: Copy PHP script file to launch daemon
+  template:
+    src: templates/ansible-php-deck.sh
+    dest: /root/ansible-php-deck.sh
+    owner: root
+    group: wheel
+    mode: 0755
+  tags: [ 'never', 'phpdaemon' ]
+
+- name: Start service ansible-php-deck, if not started
+  service:
+    name: ansible-php-deck
+    state: started
+  tags: [ 'never', 'phpdaemon' ]
+
+- name: Enable service ansible-php-deck, if not enabled
+  service:
+    name: ansible-php-deck
+    enabled: yes
+  tags: [ 'never', 'phpdaemon' ]
+
+
+
+

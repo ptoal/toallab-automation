@@ -1,0 +1,43 @@
+<section id="TasksInAPlay">
+
+<center><h2>EXAMPLE TASKS IN A PLAY</h2></center>
+
+<div class="terminal space shadow">
+    <div class="top">
+        <div class="title">Ansible Terminal</div>
+    </div>
+    <pre class="bodylw">
+<font color="pink">---</font>
+tasks<font color="red">:</font>
+<font color="red">-</font> name<font color="red">:</font> Ensure httpd package is present
+  yum<font color="red">:</font>
+    name<font color="red">:</font> httpd
+    state<font color="red">:</font> latest
+
+<font color="red">-</font> name<font color="red">:</font> Ensure latest index.html file is present
+  copy<font color="red">:</font>
+    src<font color="red">:</font> files/index.html
+    dest<font color="red">:</font> /var/www/html/
+
+<font color="red">-</font> name<font color="red">:</font> Restart httpd
+  service<font color="red">:</font>
+    name<font color="red">:</font> httpd
+    state<font color="red">:</font> restarted
+    </pre>
+</div>
+
+
+
+          <aside class="notes">
+            <p>This example shows the task list of an Ansible playbook.</p>
+            <p>
+              <ol>
+                <li>The first task assures the latest nginx package is installed using yum.</li>
+                <li>The next uses the copy module to assure the latest version of a static home page file has been published.</li>
+                <li>The last task restarts the nginx service with the service module</li>
+              </ol>
+            </p>
+          </aside>
+        </section>
+        
+

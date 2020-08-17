@@ -1,0 +1,26 @@
+<section id="PlaybookConditionals">
+<center><h2>WORKING WITH CONDITIONALS</h2>
+<p>Ansible supports the conditional execution of a task based on the run-time evaluation of variable, fact, or previous task result.</p>
+</center>
+
+<div class="terminal space shadow">
+    <div class="top">
+        <div class="title">Ansible Terminal</div>
+    </div>
+    <pre class="bodylw">
+- yum:
+    name: httpd
+    state: latest
+  <mark>when: ansible_os_family == &quot;RedHat&quot;</mark>
+    </pre>
+</div>
+
+
+            <aside class="notes">
+              <p>Conditionals are another instance of Jinja2 in action within Ansible plays themselves. In the provided example &quot;ansible_os_family&quot; is a fact variable Ansible will set.</p>
+              <p>There are other forms of conditional clauses, but <code>when</code> is usually all that is needed.</p>
+              <p>NOTE: Conditional clauses are considered to be raw Jinja2 expression without double curly braces.</p>
+            </aside>
+          </section>
+          
+

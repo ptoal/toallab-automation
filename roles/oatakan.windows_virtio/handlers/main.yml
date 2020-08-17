@@ -1,0 +1,18 @@
+---
+
+- name: Unmount
+  win_disk_image:
+    image_path: "{{ ansible_env.TEMP }}\\{{ virtio_win_iso_name }}"
+    state: absent
+  when: win_disk_image.mount_path is defined
+
+- name: Delete downloaded
+  win_file:
+    path: "{{ item }}"
+    state: absent
+  when: virtio_iso_mount_drive | length == 0
+  with_items:
+    - "{{ ansible_env.TEMP }}\\redhat_balloon.cer"
+    - "{{ ansible_env.TEMP }}\\redhat_qxldod.cer"
+    - "{{ ansible_env.TEMP }}\\{{ virtio_win_iso_name }}"
+    - "{{ ansible_env.TEMP }}\\virtio_iso_extract"

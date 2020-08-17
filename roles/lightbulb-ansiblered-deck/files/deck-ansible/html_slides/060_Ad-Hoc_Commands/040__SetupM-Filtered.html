@@ -1,0 +1,37 @@
+<section id="DiscoveredFacts">
+
+<center><h2>DISCOVERED FACTS</h2>
+</center>
+
+<div class="terminal space shadow">
+    <div class="top">
+        <div class="title">Ansible Terminal</div>
+    </div>
+    <pre class="bodym">
+<font color="silver"># Small filtered subset of discovered facts</font>
+<font color="gray"><?=$terminal_prompt?></font> ansible myserver.mine -m setup -a "filter=ansible_default_ipv4"
+
+<font color="yellow">myserver.mine | success >> </font>{
+  <font color="cyan">"ansible_facts"</font>: {
+      <font color="cyan">"ansible_default_ipv4"</font>: {
+          <font color="cyan">"address"</font>:<font color="yellow"> "10.41.17.37"</font>,
+          <font color="cyan">"alias"</font>:<font color="yellow"> "eth0"</font>,
+          <font color="cyan">"gateway"</font>:<font color="yellow"> "10.41.17.1"</font>,
+          <font color="cyan">"interface"</font>:<font color="yellow"> "eth0"</font>,
+          <font color="cyan">"macaddress"</font>:<font color="yellow"> "00:69:08:3b:a9:16"</font>,
+          <font color="cyan">"mtu"</font>:<font color="yellow"> 1500</font>,
+          <font color="cyan">"netmask"</font>:<font color="yellow"> "255.255.255.0"</font>,
+          <font color="cyan">"network"</font>:<font color="yellow"> "10.41.17.0"</font>,
+          <font color="cyan">"type"</font>:<font color="yellow"> "ether"</font>
+      },
+    </pre>
+</div>
+
+          <aside class="notes">
+            <p>The second ad-hoc command example from the prior slide provides the following JSON output of a localhost facts run.</p>
+            <p>Facts are bits of information derived from examining a host systems that are stored as variables for later use. An example of this might be the IP address of the host, or what operating system it is running. The facts Ansible will discover about a host is extensive. What's shown here is just a small sample. Run <code>ansible localhost -m setup</code> for a more complete representation.</p>
+            <p>Ansible collects facts using the <code>setup</code> module. By default, Ansible will run the <code>setup</code> module before any other tasks are executed in a playbook. These facts can be referenced by subsequent automation tasks on a per host-basis during the playbook run.</p>
+          </aside>
+        </section>
+        
+

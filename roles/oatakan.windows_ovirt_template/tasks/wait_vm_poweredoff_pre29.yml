@@ -1,0 +1,12 @@
+---
+
+- name: wait for vm status to be poweredoff
+  ovirt_vm_facts:
+    auth: "{{ ovirt_auth }}"
+    pattern: name={{ template.name }} and cluster={{ providers.ovirt.cluster }}
+  until:
+    - ovirt_vms is defined
+    - ovirt_vms|length > 0
+    - ovirt_vms[0].status == 'down'
+  delay: 5
+  retries: 30

@@ -1,0 +1,69 @@
+---
+
+- include_tasks: powershell-upgrade.yml
+  when: upgrade_powershell | bool
+
+- name: run setup module
+  setup:
+
+- include_tasks: enable-tlsv12.yml
+  when: upgrade_powershell | bool
+
+- include_tasks: disable-auto-logon.yml
+
+- include_tasks: updates.yml
+  when: install_updates | bool
+
+- include_role:
+    name: "{{ ovirt_guest_agent_role }}"
+  when: target_ovirt | bool and not target_qemu | bool
+
+- include_role:
+    name: "{{ virtio_role }}"
+  when: target_qemu | bool or ('KubeVirt' in ansible_system_vendor | default(''))
+
+- include_role:
+    name: "{{ virtualbox_guest_additions_role }}"
+  when: "'VirtualBox' in ansible_product_name"
+
+- include_role:
+    name: "{{ vmware_tools_role }}"
+  when: "'VMware' in ansible_product_name"
+
+- include_tasks: startup.yml
+
+- include_tasks: policy.yml
+
+- include_tasks: power.yml
+  when: "'Windows 10' in ansible_distribution"
+
+- include_tasks: enable-rdp.yml
+
+- include_tasks: cloudbase-init.yml
+  when:
+    - "'VMware' not in ansible_product_name"
+    - "'VirtualBox' not in ansible_product_name"
+    - ('KubeVirt' not in ansible_system_vendor | default(False))
+    - not target_ovirt | bool
+    - not target_vagrant | bool
+
+- include_tasks: remove-apps-alt-2.yml
+  when:
+    - remove_apps | bool
+    - "'Windows 10' in ansible_distribution"
+
+- include_role:
+    name: "{{ ec2_ena_driver_role }}"
+  when: target_ec2 | bool
+
+- include_tasks: clean-up-components.yml
+  when: clean_up_components | bool
+
+- include_tasks: clean-up.yml
+
+- include_tasks: sysprep.yml
+
+- include_tasks: compact.yml
+
+- include_tasks: shutdown.yml
+  when: shutdown_instance | bool

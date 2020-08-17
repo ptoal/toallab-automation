@@ -1,0 +1,41 @@
+<section id="Roles-Structure">
+<center><h2>INTRODUCTION TO ROLES</h2>
+<p>Project with Embedded Roles Example:</p>
+</center>
+
+<div class="terminal space shadow">
+    <div class="top">
+        <div class="title">Ansible Terminal</div>
+    </div>
+    <pre class="bodymw">
+<font color="gray"><?=$terminal_prompt?></font> tree example_role/
+
+example_role/
+├── defaults
+│   └── main.yml
+├── files
+├── handlers
+│   └── main.yml
+├── meta
+│   └── main.yml
+├── README.md
+├── tasks
+│   └── main.yml
+├── templates
+├── tests
+│   ├── inventory
+│   └── test.yml
+└── vars
+    └── main.yml
+
+
+
+</pre>
+</div>
+
+          <aside class="notes">
+            <p>This slide shows an example file system with a top-level playbook (site.yml) and two sample roles (common and apache) embedded in the project. Notice how the file structure under each role are similar to what we find in a play. Role deconstruct the content we'd put in a play and package it up in such a way that it is portable and easily shared and reused.</p>
+          </aside>
+        </section>
+        
+

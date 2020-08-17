@@ -1,0 +1,10 @@
+---
+
+- name: wait until the image is unlocked by the oVirt engine (<2.9)
+  ovirt_disk_facts:
+    auth: "{{ ovirt_auth }}"
+    pattern: "name={% if item.name_prefix | default(false) %}{{ template.name }}_{% endif %}{{ item.name }}"
+  until: (ovirt_disks is defined) and (ovirt_disks | length > 0) and (ovirt_disks[0].status != "locked")
+  retries: 10
+  delay: 3
+  loop: "{{ template.disks }}"

@@ -1,0 +1,34 @@
+<section id="PlaybookBlocks">
+<center><h2>WORKING WITH BLOCKS</h2>
+<p>Blocks cut down on repetitive task directives, allow for logical grouping of tasks and even in play error handling.</p>
+</center>
+
+<div class="terminal space shadow">
+    <div class="top">
+        <div class="title">Ansible Terminal</div>
+    </div>
+    <pre class="bodylw">
+  <mark>block:</mark>
+  - yum:
+      name: &quot;{{ item }}&quot;
+      state: latest
+    with_items:
+    - httpd
+    - php56
+
+  - template:
+      src: templates/httpd.conf.j2
+      dest: /etc/httpd/conf/httpd.conf
+  <mark>when: ansible_os_family == &quot;RedHat&quot;</mark>
+    </pre>
+</div>
+
+
+            <aside class="notes">
+              <p>In the provided example we use a block to group two tasks that are to be conditional executed if a host is running a Red Hat family linux using one conditional clause. In practice, we could have copied the <code>when</code> clause onto each task and gotten same result. Using a block, there is less clutter thereby less to maintain and nothing to keep in sync. The utility of using a block increases the more tasks and clauses are in use.</p>
+              <p>Blocks have a play in error handling and automating roll backs that we won't get into here given the scope of that topic.</p>
+              <p>See the <a href="http://docs.ansible.com/ansible/playbooks_blocks.html">documentation on blocks</a> to dig deeper.</p>
+          </section>
+        </section>
+        
+

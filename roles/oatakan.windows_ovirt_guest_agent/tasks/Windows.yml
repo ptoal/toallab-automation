@@ -1,0 +1,61 @@
+---
+
+- name: "{{ ansible_distribution | lower }} | import virtio role"
+  import_role:
+    name: "{{ virtio_role }}"
+  vars:
+    virtio_win_iso_url: "{{ ovirt_win_iso_url }}"
+    virtio_win_iso_name: "{{ ovirt_win_iso_name }}"
+    virtio_win_ovirt: true
+    virtio_win_iso_path: ''
+
+- debug:
+    var: virtio_win_iso_path
+
+#- name: "{{ ansible_distribution | lower }} | install Ovirt Guest Agent"
+#  win_dsc:
+#    resource_name: Package
+#    Path: '{{ virtio_win_iso_path }}\ovirt-guest-tools-setup.exe'
+#    ProductId: '{9B265631-958D-415B-9925-53DEEC43E31D}'
+#    Name: QEMU guest agent
+#    Arguments: >
+#      /S
+
+- name: "{{ ansible_distribution | lower }} | install Ovirt Guest Agent"
+  win_shell: '{{ virtio_win_iso_path }}\ovirt-guest-tools-setup.exe /S'
+  args:
+    executable: cmd
+    creates: "{{ ansible_env['ProgramFiles(x86)'] }}\\oVirt Guest Tools"
+  async: 1
+  poll: 0
+  ignore_errors: yes
+
+- name: "{{ ansible_distribution | lower }} | wait for system to be online"
+  wait_for_connection:
+    connect_timeout: 10
+    sleep: 5
+    delay: 90
+    timeout: 300
+
+- name: "{{ ansible_distribution | lower }} | get service information"
+  win_shell: Get-Service OVirtGuestService | ConvertTo-Json
+  register: register_service_info
+  ignore_errors: yes
+
+- name: "{{ ansible_distribution | lower }} | set fact from service info"
+  set_fact:
+    ovirt_guest_agent_service_status: "{{ register_service_info.stdout | default('DEFAULT') | from_json }}"
+  when: register_service_info is success
+  ignore_errors: yes
+
+- name: "{{ ansible_distribution | lower }} | set fact as not installed"
+  set_fact:
+    ovirt_guest_agent_service_status:
+      DisplayName: 'ovirt-guest-agent'
+      Status: 9
+  when: register_service_info is undefined
+
+- name: "{{ ansible_distribution | lower }} | service display status"
+  debug:
+    msg: "{{ ovirt_guest_agent_service_status['DisplayName'] }} is {{ windows_service_status_code[ovirt_guest_agent_service_status['Status']] | lower }}"
+  when: ovirt_guest_agent_service_status is defined

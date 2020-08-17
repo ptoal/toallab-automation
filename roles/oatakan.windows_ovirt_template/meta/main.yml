@@ -1,0 +1,28 @@
+---
+galaxy_info:
+  author: Orcun Atakan
+  description: Ansible galaxy role for building a Windows VM templates from an ISO file on Ovirt/RHV.
+  role_name: windows_ovirt_template
+  company: Red Hat
+
+  license: MIT
+
+  min_ansible_version: 2.5
+
+  platforms:
+    - name: Windows
+      versions:
+        - all
+
+  cloud_platforms:
+    - oVirt
+
+  galaxy_tags:
+    - windows
+    - ovirt
+    - rhv
+    - cloud
+    - multicloud
+    - template
+
+dependencies: []

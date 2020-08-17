@@ -1,0 +1,71 @@
+---
+
+temp_directory: tmp{{ awx_job_id | default('') }}
+
+iso_file: "windows_{{ windows_distro_name }}_autounattend{{ awx_job_id | default('') }}.iso"
+
+export_dir: "{{ playbook_dir }}/{{ temp_directory }}"
+
+unattend:
+  administrator_password: "{{ local_administrator_password }}"
+  local_accounts:
+    - name: "{{ local_account_username }}"
+      display_name: "{{ local_account_username }}"
+      description: "{{ local_account_username }} user"
+      group: Administrators
+      password: "{{ local_account_password }}"
+  settings:
+    computer_name: wintemp
+    time_zone: UTC
+    skip_auto_activation: true
+  product_key: "{{ iso_product_key | default('') }}"
+
+providers:
+  ovirt:
+    datacenter: "{{ ovirt_datacenter }}"
+    cluster: "{{ ovirt_cluster }}"
+    data_domain: "{{ ovirt_data_domain }}"
+    export_domain: "{{ ovirt_export_domain }}"
+    iso_domain: "{{ ovirt_iso_domain }}"
+
+template:
+  name: "{{ template_vm_name }}"
+  role: windows_template
+  app_name: windows_template_generate
+  domain: "{{ template_vm_domain }}"
+  disks:
+    - name: "{{ template_vm_name }}"
+      size: "{{ template_vm_root_disk_size }}GiB"
+      format: "{{ template_vm_root_disk_format }}"
+      interface: "{{ template_vm_root_disk_interface | default('virtio') }}"
+      bootable: yes
+      storage_domain: "{{ providers.ovirt.data_domain | default('data_domain') }}"
+  memory: "{{ template_vm_memory }}"
+  cpu: "{{ template_vm_cpu }}"
+  networks:
+    - name: "{{ template_vm_network_name }}"
+      ip: "{{ template_vm_ip_address }}"
+      netmask: "{{ template_vm_netmask }}"
+      gateway: "{{ template_vm_gateway }}"
+      domain: "{{ template_vm_domain }}"
+      device_type: e1000
+      dns_servers: "{{ template_vm_dns_servers }}"
+  cd_iso: "{{ iso_file_id | default(iso_file_name) }}"  # if using data domain, file name does not work, need to use id
+
+qemu_cmdline_second_iso:
+  - -device
+  - ide-cd,bus=ide.3,unit=0,drive=drive-ua-0001,id=ua-0001,bootindex=3
+  - -drive
+  - format=raw,if=none,id=drive-ua-0001,werror=report,rerror=report,readonly=on,file=/rhev/data-center/{{ ovirt_datacenter_id }}/{{ ovirt_datastore_id }}/images/{{ ks_iso_file_disk_id }}/{{ ks_iso_file_image_id }}
+
+qemu_cmdline_efi:
+  - -drive
+  - if=pflash,format=raw,readonly,file=/usr/share/edk2.git/ovmf-x64/OVMF_CODE-pure-efi.fd
+
+custom_properties:
+  - name: qemu_cmdline
+    value: "{{ ((qemu_cmdline_second_iso + qemu_cmdline_efi) | to_json) if template_vm_efi|bool else (qemu_cmdline_second_iso | to_json) }}"
+
+custom_properties_efi:
+  - name: qemu_cmdline
+    value: "{{ qemu_cmdline_efi | to_json }}"

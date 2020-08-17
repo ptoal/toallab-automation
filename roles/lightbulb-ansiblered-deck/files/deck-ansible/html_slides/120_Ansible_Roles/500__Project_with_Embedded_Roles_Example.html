@@ -1,0 +1,79 @@
+<section id="RolesEmbeddedFiles">
+<center><h2>INTRODUCTION TO ROLES</h2>
+<p>Project with Embedded Roles Example:</p>
+</center>
+
+<table>
+	<tr>
+		<td>
+<div class="terminal space shadow">
+    <div class="top">
+        <div class="title">Ansible Terminal</div>
+    </div>
+    <pre class="bodysw">
+<font color="silver">Some directories omitted for readability</font>
+├── site.yml
+└── roles
+    ├── apache_role
+    │   ├── defaults
+    │   │   └── main.yml
+    │   ├── files
+    │   │   └── index.html
+    │   ├── handlers 
+    │   │   └── main.yml
+    │   ├── tasks
+    │   │   └── main.yml
+    │   ├── templates
+    │   │   └── http.conf.j2
+    │   └── vars
+    │       └── main.yml
+    └── security_standards
+        ├── defaults
+        │   └── main.yml
+        ├── files
+        │   ├── sshd_conf
+        │   └── sudoers
+        ├── handlers
+        │   └── main.yml
+        ├── tasks
+        │   └── main.yml
+        ├── templates
+        │   ├── etc_issue
+        │   └── etc_motd
+        └── vars
+            └── main.yml    </pre>
+</div>
+	</td>
+	<td>
+	<div class="terminal space shadow">
+    <div class="top">
+        <div class="title">Some Interesting Files To Consider</div>
+    </div>
+    <pre class="bodylw">
+apache_role
+    <mark>tasks/main.yml</mark>
+    defaults/<mark>main.yml</mark>
+    files/<mark>index.html</mark>
+    templates/<mark>http.conf.j2</mark>
+    vars/main.yml
+ 
+security_standards
+    <mark>tasks/main.yml</mark>
+    defaults/<mark>main.yml</mark>
+    files/<mark>sshd_conf</mark>
+    files/<mark>sudoers</mark>
+    templates/<mark>etc_issue</mark>
+    templates/<mark>etc_motd</mark>
+    vars/main.yml
+    </pre>
+</div>
+</td>
+</tr>
+</table>
+
+          <aside class="notes">
+            <p>This slide shows an example file system with a top-level playbook (site.yml) and two sample roles (common and apache) embedded in the project. Notice how the file structure under each role are similar to what we find in a play. Role deconstruct the content we'd put in a play and package it up in such a way that it is portable and easily shared and reused.</p>
+          </aside>
+        </section>
+        
+

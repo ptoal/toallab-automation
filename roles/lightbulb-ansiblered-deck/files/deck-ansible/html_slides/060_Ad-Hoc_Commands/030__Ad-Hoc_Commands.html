@@ -1,0 +1,29 @@
+<section id="AdHocCommands-Terminal">
+
+<center><h2>AD HOC COMMANDS</h2></center>
+
+<div class="terminal space shadow">
+    <div class="top">
+        <div class="title">Ansible Terminal</div>
+    </div>
+    <pre class="bodyl">
+<font color="silver"># Check connections (submarine ping, not ICMP)</font>
+<font color="gray"><?=$terminal_prompt?></font> ansible all -m ping
+
+<font color="silver"># Run a command on all the hosts in the web group</font>
+<font color="gray"><?=$terminal_prompt?></font> ansible web -m command -a &quot;uptime&quot;
+
+<font color="silver"># Collect and display known facts</font>
+<font color="gray"><?=$terminal_prompt?></font> ansible localhost -m setup
+    </pre>
+</div>
+
+          <aside class="notes">
+            <p>Ad-hoc commands are quick checks on your servers that you don’t want to preserve in an Ansible playbook.</p>
+            <p>An ad-hoc command can be used to do some tasks that you might not necessarily want to write a full playbook and save for later.</p>
+            <p>This is a good place to start to understand the basics of what Ansible can do prior to learning about playbooks where the true power of Ansible automation lies.</p>
+            <p>For more information see <a href="http://docs.ansible.com/ansible/intro_adhoc.html">Introduction To Ad-Hoc Commands</a>.</p>
+          </aside>
+        </section>
+        
+

@@ -1,0 +1,26 @@
+---
+
+# this takes precedence, if a mounted drive is provided, we'll install from there
+virtio_iso_mount_drive: ''
+
+virtio_changelog_url: https://fedorapeople.org/groups/virt/virtio-win/CHANGELOG
+virtio_changelog_query: '(\d+).(\d+).(\d+)-(\d+)'
+virtio_win_iso_url: "https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/archive-virtio/virtio-win-{{ virtio_version }}/virtio-win.iso"
+virtio_win_iso_name: virtio-win.iso
+virtio_win_ovirt: false
+virtio_win_facts: "{{ ansible_env.SystemDrive }}\\{{ source_of_supply_name | default('Support') }}\\facts.d"
+
+virtio_driver_directory: >-
+      {% if 'Windows Server 2019' in ansible_distribution -%}
+        {% set virt_dir = '2k19' %}
+      {% elif 'Windows Server 2016' in ansible_distribution -%}
+        {% set virt_dir = '2k16' %}
+      {% elif 'Windows Server 2012 R2' in ansible_distribution -%}
+        {% set virt_dir = '2k12R2' %}
+      {% elif 'Windows Server 2008 R2' in ansible_distribution -%}
+        {% set virt_dir = '2k8R2' %}
+      {% elif 'Windows 10' in ansible_distribution -%}
+        {% set virt_dir = 'w10' %}
+      {% else -%}
+        {% set virt_dir = 'w10' %}
+      {%- endif %}{{ virt_dir }}

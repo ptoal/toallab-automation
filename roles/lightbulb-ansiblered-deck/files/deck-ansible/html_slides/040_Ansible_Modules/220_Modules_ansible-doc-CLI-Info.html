@@ -1,0 +1,208 @@
+<section id="ModuleDoc-CLI-InfoScroll">
+  <h2>Modules Documentation</h2>
+<p>Returns a thorough description of the parameters in the module.</p>
+
+<div class="terminal space shadow" onclick="scrollDiv_init('AnsibleDocsInfo','1'); this.onclick = null;" style="cursor: pointer;">
+    <div class="top">
+        <div class="title">
+       	 <a href="javascript:pauseDiv()" style="none; cursor: pointer;">Ansible Terminal</a>
+       	</div>
+    </div>
+    <pre class="bodymw">
+<font color="gray"><?=$terminal_prompt?></font> ansible-doc copy 
+<div id="AnsibleDocsInfo" style="overflow:auto;width:auto;height:700px">
+> COPY    (/usr/lib/python2.7/site-packages/ansible/modules/files/copy.py)
+
+        The `copy' module copies a file from the local or remote machine to a
+        location on the remote machine. Use the [fetch] module to copy files
+        from remote locations to the local box. If you need variable
+        interpolation in copied files, use the [template] module. For Windows
+        targets, use the [win_copy] module instead.
+
+  * note: This module has a corresponding action plugin.
+
+OPTIONS (= is mandatory):
+
+- attributes
+        Attributes the file or directory should have. To get supported flags
+        look at the man page for `chattr' on the target system. This string
+        should contain the attributes in the same order as the one displayed by
+        `lsattr'.
+        (Aliases: attr)[Default: (null)]
+        version_added: 2.3
+
+- backup
+        Create a backup file including the timestamp information so you can get
+        the original file back if you somehow clobbered it incorrectly.
+        [Default: no]
+        type: bool
+        version_added: 0.7
+
+- checksum
+        SHA1 checksum of the file being transferred. Used to validate that the
+        copy of the file was successful.
+        If this is not provided, ansible will use the local calculated checksum
+        of the src file.
+        [Default: (null)]
+        version_added: 2.5
+
+- content
+        When used instead of `src', sets the contents of a file directly to the
+        specified value. For anything advanced or with formatting also look at
+        the template module.
+        [Default: (null)]
+        version_added: 1.1
+
+- decrypt
+        This option controls the autodecryption of source files using vault.
+        [Default: Yes]
+        type: bool
+        version_added: 2.4
+
+= dest
+        Remote absolute path where the file should be copied to. If `src' is a
+        directory, this must be a directory too. If `dest' is a nonexistent path
+        and if either `dest' ends with "/" or `src' is a directory, `dest' is
+        created. If `src' and `dest' are files, the parent directory of `dest'
+        isn't created: the task fails if it doesn't already exist.
+
+
+- directory_mode
+        When doing a recursive copy set the mode for the directories. If this is
+        not set we will use the system defaults. The mode is only set on
+        directories which are newly created, and will not affect those that
+        already existed.
+        [Default: (null)]
+        version_added: 1.5
+
+- follow
+        This flag indicates that filesystem links in the destination, if they
+        exist, should be followed.
+        [Default: no]
+        type: bool
+        version_added: 1.8
+
+- force
+        the default is `yes', which will replace the remote file when contents
+        are different than the source. If `no', the file will only be
+        transferred if the destination does not exist.
+        (Aliases: thirsty)[Default: yes]
+        type: bool
+        version_added: 1.1
+
+- group
+        Name of the group that should own the file/directory, as would be fed to
+        `chown'.
+        [Default: (null)]
+
+- local_follow
+        This flag indicates that filesystem links in the source tree, if they
+        exist, should be followed.
+        [Default: yes]
+        type: bool
+        version_added: 2.4
+
+- mode
+        Mode the file or directory should be. For those used to `/usr/bin/chmod'
+        remember that modes are actually octal numbers.  You must either specify
+        the leading zero so that Ansible's YAML parser knows it is an octal
+        number (like `0644' or `01777') or quote it (like `'644'' or `'0644'' so
+        Ansible receives a string and can do its own conversion from string into
+        number.  Giving Ansible a number without following one of these rules
+        will end up with a decimal number which will have unexpected results.
+        As of version 1.8, the mode may be specified as a symbolic mode (for
+        example, `u+rwx' or `u=rw,g=r,o=r').  As of version 2.3, the mode may
+        also be the special string `preserve'.  `preserve' means that the file
+        will be given the same permissions as the source file.
+        [Default: (null)]
+
+- owner
+        Name of the user that should own the file/directory, as would be fed to
+        `chown'.
+        [Default: (null)]
+
+- remote_src
+        If `no', it will search for `src' at originating/master machine.
+        If `yes' it will go to the remote/target machine for the `src'. Default
+        is `no'.
+        Currently `remote_src' does not support recursive copying.
+        `remote_src' only works with `mode=preserve' as of version 2.6.
+        [Default: no]
+        type: bool
+        version_added: 2.0
+
+- selevel
+        Level part of the SELinux file context. This is the MLS/MCS attribute,
+        sometimes known as the `range'. `_default' feature works as for
+        `seuser'.
+        [Default: s0]
+
+- serole
+        Role part of SELinux file context, `_default' feature works as for
+        `seuser'.
+        [Default: (null)]
+
+- setype
+        Type part of SELinux file context, `_default' feature works as for
+        `seuser'.
+        [Default: (null)]
+
+- seuser
+        User part of SELinux file context. Will default to system policy, if
+        applicable. If set to `_default', it will use the `user' portion of the
+        policy if available.
+        [Default: (null)]
+
+- src
+        Local path to a file to copy to the remote server; can be absolute or
+        relative. If path is a directory, it is copied recursively. In this
+        case, if path ends with "/", only inside contents of that directory are
+        copied to destination. Otherwise, if it does not end with "/", the
+        directory itself with all contents is copied. This behavior is similar
+        to Rsync.
+        [Default: (null)]
+
+- unsafe_writes
+        Normally this module uses atomic operations to prevent data corruption
+        or inconsistent reads from the target files, sometimes systems are
+        configured or just broken in ways that prevent this. One example are
+        docker mounted files, they cannot be updated atomically and can only be
+        done in an unsafe manner.
+        This boolean option allows ansible to fall back to unsafe methods of
+        updating files for those cases in which you do not have any other
+        choice. Be aware that this is subject to race conditions and can lead to
+        data corruption.
+        [Default: no]
+        type: bool
+        version_added: 2.2
+
+- validate
+        The validation command to run before copying into place. The path to the
+        file to validate is passed in via '%s' which must be present as in the
+        example below. The command is passed securely so shell features like
+        expansion and pipes won't work.
+        [Default: (null)]
+
+
+NOTES:
+      * The [copy] module recursively copy facility does not scale to lots
+        (>hundreds) of files. For alternative, see [synchronize] module,
+        which is a wrapper around `rsync'.
+      * For Windows targets, use the [win_copy] module instead.
+
+AUTHOR: Ansible Core Team, Michael DeHaan
+        METADATA:
+          status:
+          - stableinterface
+          supported_by: core
+        
+
+	</div>
+    </pre>
+</div>
+
+  <aside class="notes">
+	<p><b>TO Make This List SCROLL</b>, click anywhere on the terminal window</p>
+	<p><b>TO Make This List STOP</b>, click the "Ansible Terminal" text on top of the console</p>
+  </aside>
+</section>

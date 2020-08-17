@@ -1,0 +1,46 @@
+<section id="PlayVariables">
+<center><h2>PLAY VARIABLES</h2></center>
+
+<div class="terminal space shadow">
+    <div class="top">
+        <div class="title">Ansible Terminal</div>
+    </div>
+    <pre class="bodymw">
+- name: Ensure apache is installed and started
+  hosts: web
+  become: yes
+<mark>  vars:                                </mark>
+<mark>    http_port: 80                      </mark>
+<mark>    http_docroot: /var/www/gokev.com   </mark>
+
+  tasks:
+  - name: Ensure httpd package is present
+    yum:
+      name: httpd
+      state: latest
+
+  - name: Verify correct config file is present
+    template:
+      src: <mark>templates/httpd.conf.j2</mark>
+      dest: /etc/httpd/conf/httpd.conf
+
+  - name: Ensure httpd is started
+    service:
+      name: httpd
+      state: started
+    </pre>
+</div>
+
+          <div style="position:absolute; right: -350px; top: 275px;">	
+			  <p class="fragment current-visible" data-fragment-index="1">
+		        <img src="images/httpd_conf_template.png" width="1200">
+		      </p>
+		  </div>
+
+          <aside class="notes">
+            <p>Variables are used to store metadata for each host drawing from numerous sources. Here we see another one of those sources, a variable &quot;http_port&quot; that has been embedded in a play.</p>
+            <p>Recalling the previous variable precedence slide, play variables are number 7 in Ansible&apos;s the precedence chain.</p>
+          </aside>
+        </section>
+        
+
