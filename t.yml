@@ -1,0 +1,45 @@
+---
+- name: DHCP Server
+  hosts: service_dhcp
+  connection: local
+
+  pre_tasks:
+    # - name: Gather interfaces for dhcp service
+    #   set_fact:
+    #     dhcp_interfaces:
+    # - name: Gather subnets
+    #   set_fact:
+    #     subnets: ""
+    #     prefixes: "{{ query('netbox.netbox.nb_lookup', 'prefixes', api_endpoint=netbox_api, token=netbox_token) }}"
+
+    # - ip: 192.168.222.0
+    #   netmask: 255.255.255.128
+    #   domain_name_servers:
+    #     - 10.0.2.3
+    #     - 10.0.2.4
+    #   range_begin: 192.168.222.50
+    #   range_end: 192.168.222.127
+    # - ip: 192.168.222.128
+    #   default_lease_time: 3600
+    #   max_lease_time: 7200
+    #   netmask: 255.255.255.128
+    #   domain_name_servers: 10.0.2.3
+    #   routers: 192.168.222.129
+  roles:
+    - name: sage905.netbox-to-dhcp
+
+  # tasks:
+  #   - debug:
+  #       var: services
+
+  #   # - name: Collect Prefix information for interfaces in DHCP Service
+
+  #   - name: Collect host interfaces
+  #     set_fact:
+  #       dhcp_prefixes: "{{ query('netbox.netbox.nb_lookup', 'prefixes', api_filter='', api_endpoint=netbox_api, token=netbox_token) }}"
+
+  #   - name: Test
+  #     debug: var=dhcp_service
+{% for interface in (services|selectattr('name','eq','dhcp')|first).ipaddresses %}
+{% set prefix=(query('netbox.netbox.nb_lookup', 'prefixes', api_filter='q=' + interface.address, api_endpoint=netbox_api, token=netbox_token)|first).value %}
+subnet {{ prefix.prefix|ipaddr('net') }} netmask {{ prefix.prefix|ipaddr('netmask') }} {

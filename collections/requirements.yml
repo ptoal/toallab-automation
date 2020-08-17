@@ -5,3 +5,9 @@ collections:
 
   - name: netbox.netbox
     source: https://galaxy.ansible.com
+
+  - name: freeipa.ansible_freeipa  
+    source: https://galaxy.ansible.com
+
+  - name: ovirt.ovirt
+    source: https://galaxy.ansible.com

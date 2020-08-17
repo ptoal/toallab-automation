@@ -1,7 +1,54 @@
 # Playbook to build new VMs in RHV Cluster
 # Currently only builds RHEL VMs
+
+# Create Host
+
+- name: Preflight checks
+  hosts: tag_build
+  gather_facts: false
+  tasks:
+    - assert:
+        that:
+          - site == "sagely_dc"
+          - is_virtual
+
+- name: Ensure Primary IP exists and is in DNS
+  hosts: tag_build
+  gather_facts: false
+
+  tasks:
+    - name: Get unused IP Address from pool
+      netbox.netbox.netbox_ip_address:
+        netbox_url: "{{ netbox_api }}"
+        netbox_token: "{{ netbox_token }}"
+        data:
+          prefix: 192.168.16.0/20
+        state: new
+      register: new_ip
+      when: primary_ipv4 is undefined
+      delegate_to: localhost
+
+    - set_fact:
+        primary_ipv4: "{{ new_ip.ip_address.address|ipaddr('address') }}"
+        vm_hostname: "{{ inventory_hostname.split('.')[0] }}"
+        vm_domain: "{{ inventory_hostname.split('.',1)[1] }}"
+      delegate_to: localhost
+      when: primary_ipv4 is undefined
+
+    - name: Ensure IP Address in IdM
+      freeipa.ansible_freeipa.ipadnsrecord:
+        records:
+          - name: "{{ vm_hostname }}"
+            zone_name: "{{ vm_domain }}"
+            record_type: A
+            record_value:
+              - "{{ new_ip.ip_address.address|ipaddr('address') }}"
+            create_reverse: true
+        ipaadmin_password: "{{ ipaadmin_password }}"
+      delegate_to: idm1.mgmt.toal.ca
+
 - name: Create VMs
-  hosts: cluster_ToalLabRHV
+  hosts: tag_build
   connection: local
   gather_facts: no
   collections:
@@ -10,10 +57,6 @@
     # Workaround to get correct venv python interpreter
     ansible_python_interpreter: "{{ ansible_playbook_python }}"
 
-  # Never run this, unless specifically enabled
-  # tags:
-  #  - never
-  #  - rebuild
 
   tasks:
     - name: Basic Disk Profile
@@ -60,7 +103,7 @@
         disks: '{{ vm_disks }}'
         cpu_cores: '{{ vcpus }}'
         cluster: '{{ cluster }}'
-        # Damn... This is ugly
+        # This is ugly Can we do better?
         operating_system: '{{ query("netbox.netbox.nb_lookup", "platforms", api_filter=nb_query_filter, api_endpoint=netbox_api, token=netbox_token)[0].value.name }}'
         type: server
         graphical_console:
@@ -96,7 +139,7 @@
       register: vm_build_result
 
 - name: Ensure VM is running and reachable
-  hosts: cluster_ToalLabRHV
+  hosts: tag_build
   gather_facts: no
   connection: local
   vars:
@@ -116,3 +159,5 @@
       wait_for_connection:
         timeout: 1800
         sleep: 5
+
+#TODO: Clear Build tag

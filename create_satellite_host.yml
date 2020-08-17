@@ -1,0 +1,24 @@
+---
+- name: Create new VM / Host in Satellite
+  hosts: sat6.lab.toal.ca
+  vars:
+    sat6_fqdn: "sat6.lab.toal.ca"
+    #sat6_pass: "this is set in the secrets file"
+    sat6_organization: "Toal.ca"
+    sat6_fail_on_existing: True
+    sat6_power_on_delay: 60
+    sat6_hosts:
+      #VM
+      - name: "rhel1"
+        host_group: "Lab RHEL Hosts/RHEL 8"
+        location: "Lab"
+        ipv4: "192.168.16.10"
+        domain: "sandbox.toal.ca"
+        comment: "Demo Server"
+        compute_resource: "Home Lab"
+        compute_profile: "2-Medium"
+        parameters:
+          - name: "build_type"
+            value: "httpd"
+  roles:
+    - ahuffman.sat6_create_hosts

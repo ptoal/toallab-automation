@@ -1,18 +1,12 @@
 # Toal Lab Site Playbook
-- name: Set up Network interfaces
-  hosts: all
-  gather_facts: true
-  become: true
-
-  roles:
-    - name: linux-system-roles.network
-      when: network_connections is defined
-
 - name: Common Lab Machine Setup
   hosts: platform_linux,platform_fedora_linux
   become: true
   roles:
-    - toal-common
+
+   - name: linux-system-roles.network
+     when: network_connections is defined
+   - name: toal-common
 
 - name: Set Network OS from Netbox info.
   gather_facts: no
@@ -31,11 +25,40 @@
   roles:
     - toallab.infrastructure
 
+- name: DHCP Server
+  hosts: service_dhcp
+  become: yes
+
+  pre_tasks:
+    # - name: Gather interfaces for dhcp service
+    #   set_fact:
+    #     dhcp_interfaces:
+    # - name: Gather subnets
+    #   set_fact:
+    #     subnets: ""
+    #     prefixes: "{{ query('netbox.netbox.nb_lookup', 'prefixes', api_endpoint=netbox_api, token=netbox_token) }}"
+
+    # - ip: 192.168.222.0
+    #   netmask: 255.255.255.128
+    #   domain_name_servers:
+    #     - 10.0.2.3
+    #     - 10.0.2.4
+    #   range_begin: 192.168.222.50
+    #   range_end: 192.168.222.127
+    # - ip: 192.168.222.128
+    #   default_lease_time: 3600
+    #   max_lease_time: 7200
+    #   netmask: 255.255.255.128
+    #   domain_name_servers: 10.0.2.3
+    #   routers: 192.168.222.129
+  roles:
+    - name: sage905.netbox-to-dhcp
+
 - name: Include Minecraft tasks
   import_playbook: minecraft.yml
 
-- name: Include Gitea tasks
-  import_playbook: gitea.yml
+# - name: Include Gitea tasks
+#   import_playbook: gitea.yml
 
 # - name: Include Pod Host
 #   include: podhost.yml

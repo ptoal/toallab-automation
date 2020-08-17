@@ -1,0 +1,33 @@
+---
+# Create Host
+- name: Get IP Address from pool
+  hosts: localhost
+
+  tasks:
+    - name: Get unused IP Address from pool
+      netbox.netbox.netbox_ip_address:
+        netbox_url: "{{ netbox_api }}"
+        netbox_token: "{{ netbox_token }}"
+        data:
+          prefix: 192.168.16.0/20
+        state: new
+      register: new_ip
+
+    - debug: var=new_ip
+
+    - name: Create IP Address in IdM
+      freeipa.ansible_freeipa.ipadnsrecord:
+        records:
+          - name: test1
+            zone_name: sandbox.toal.ca
+            record_type: A
+            record_value:
+              - "{{ new_ip.ip_address.address|ipaddr('address') }}"
+            create_reverse: true
+        ipaadmin_password: "{{ ipaadmin_password }}"
+      delegate_to: idm1.mgmt.toal.ca
+
+
+    # - name: Create Satellite Host
+    # - name: Create RHV VM
+    # - name:
