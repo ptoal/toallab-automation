@@ -1,5 +1,3 @@
-# Ansible Red
-- src: https://github.com/ptoal/lightbulb-ansiblered-deck
 # Java
 - name: geerlingguy.java
 # Node.js (Using this repo temporarily, as it fixes a package naming bug (See #95))
