@@ -1,7 +1,7 @@
 ---
 # Probably want to split this out into a proper certificate management role for Toal.ca
 - name: Request TLS Certificate from LetsEncrypt
-  hosts: rhv.mgmt.toal.ca
+  hosts: localhost
   connection: local
   gather_facts: false
   # This doesn't belong here
@@ -12,6 +12,7 @@
     root_certificate: https://letsencrypt.org/certs/trustid-x3-root.pem.txt
     domains:
       - rhv.mgmt.toal.ca
+      - rhv.lan.toal.ca
 
   pre_tasks:
     - name: Ensure Let's Encrypt Account Exists

@@ -1,0 +1,54 @@
+---
+- name: VM Provisioning
+  hosts: tag_ansible:&tag_tower:&cluster_ToalLabRHV
+  connection: local
+
+  tasks:
+    - block:
+      - name: Obtain SSO token from username / password credentials
+        redhat.rhv.ovirt_auth:
+          url: "{{ ovirt_url }}"
+          username: "{{ ovirt_username }}"
+          password: "{{ ovirt_password }}"
+
+      - name: Disks Created
+        ovirt_disk:
+            auth: "{{ ovirt_auth }}"
+            description: "Boot Disk for {{ inventory_hostname }}"
+            interface: virtio
+            size: 120GiB
+            storage_domain: nas_iscsi
+            bootable: True
+            wait: true
+            name: "{{ inventory_hostname }}_disk0"
+            state: present
+
+      - name: Add NIC to VM
+        ovirt_nic:
+          state: present
+          vm:
+          name: mynic
+          interface: e1000
+          mac_address: 00:1a:4a:16:01:56
+          profile: ovirtmgmt
+          network: ovirtmgmt
+
+      - name: Plug NIC to VM
+        redhat.rhv.ovirt_nic:
+          state: plugged
+          vm: myvm
+          name: mynic
+
+
+      always:
+        - name: Always revoke the SSO token
+          ovirt_auth:
+            state: absent
+            ovirt_auth: "{{ ovirt_auth }}"
+
+  collections:
+    - redhat.rhv
+
+# - name: VM Configuration
+# - name: Automation Platform Installer
+# - name:

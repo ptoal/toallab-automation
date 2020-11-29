@@ -1,0 +1,16 @@
+---
+- name: Publish CVs
+  hosts: sat6.lab.toal.ca
+  connection: local
+
+  tasks:
+    - name: Publish Content View
+      redhat.satellite.content_view_version:
+        username: "{{ vault_sat6_user }}"
+        password: "{{ vault_sat6_pass }}"
+        server_url: "https://{{ inventory_hostname }}"
+        validate_certs: false
+        content_view: "RHEL8"
+        organization: "Toal.ca"
+        lifecycle_environments:
+        - Library
