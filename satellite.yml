@@ -1,34 +1,32 @@
 # Playbook to install Satellite server on RHV
 
-# TODO: Autocreate pxeboot environment on tftp server. This was a partial attempt to create the ks file
-# and dump it on the NAS.   
-# Note for my future self: Don't bother trying to attach a VFD/ISO with the ks file.  It will all
-# end in tears, because RHV4.2 doesn't have the APIs / functionality.
+- name: Prepare RHV for Build
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: Obtain SSO token from username / password credentials
+      redhat.rhv.ovirt_auth:
+        url: "{{ ovirt_url }}"
+        username: "{{ ovirt_username }}"
+        password: "{{ ovirt_password }}"
 
-# - name: Prepare Kickstart Files
-#   hosts: vms
-#   connection: local
-#   gather_facts: no
-      
-#   tasks:
-    # - name: Get first nfs server
-    #   set_fact: ks_nfs_server="{{ groups['nfs_server'][0] }}"
-    # - set_fact: ks_file="{{ hostvars[ks_nfs_server]['nfs_dir'] }}/{{ inventory_hostname }}.cfg"
-
-    # - name: Copy ks file to builddir
-    #   template:
-    #     src: templates/ks.cfg
-    #     dest: "{{ ks_file }}"
-    #   delegate_to: "{{ ks_nfs_server }}"
+    - name: ISO is uploaded to RHV
+      redhat.rhv.ovirt_disk:
+        name: "{{ rhel_iso_filename }}"
+        upload_image_path: "{{ rhel_iso_path }}/{{ rhel_iso_filename }}"
+        storage_domain: ssdvdo0
+        size: 5 GiB
+        wait: true
+        bootable: true
+        format: raw
+        content_type: iso
+      register: iso_disk
 
 - name: Create VMs
-  hosts: vms
+  hosts: "{{ vm_name }}"
   connection: local
   gather_facts: no
   # Never run this, unless specifically enabled
-  tags: 
-   - never
-   - rebuild
   vars:
     # Hack to work around virtualenv python interpreter
     ansible_python_interpreter: "{{ ansible_playbook_python }}"
@@ -36,184 +34,196 @@
   tasks:
     - name: Remove known_hosts entry
       known_hosts:
-        name: "{{ inventory_hostname }}"
+        name: "{{ vm_name }}"
         state: absent
 
-    - name: Create VM Disks
+    - name: Create VM disk
       ovirt_disk:
-        auth: "{{ ovirt_auth }}"
-        name: '{{ item.name }}'
-        description: '{{ item.descr }}'
-        interface: '{{ item.interface }}'
-        size: '{{ item.size }}'
-        state: '{{ item.state }}'
-        sparse: '{{ item.sparse }}'
+        name: "{{ vm_name }}_Disk0"
+        description: '{{ vm_name }} Primary Disk'
+        interface: 'virtio_scsi'
+        size: '{{ disk }}GiB'
+        state: attached
+        sparse: yes
         wait: true
-        storage_domain: "{{ item.storage_domain }}"
+        storage_domain: "ssdvdo0"
       async: 300
       poll: 15
-      loop: "{{ vm_disks }}"
-      # If we change the disks, we will PXE Boot the Server for install
-      notify: PXE Boot
 
     - name: Create Satellite VM in RHV
       ovirt_vm:
-        auth: "{{ ovirt_auth }}"
         name: "{{ vm_name }}"
         state: present
-        memory: "{{ vm_memory }}"
-        disks: "{{ vm_disks }}"
-        cpu_cores: "{{ vm_cpu_cores }}"
-        cluster: "{{ vm_cluster }}"
-        operating_system: "{{ vm_os }}"
+        memory: "{{ memory}}GiB"
+        disks:
+          - name: "{{ vm_name }}_Disk0"
+            activate: yes
+            bootable: yes
+        cpu_cores: "{{ vcpus }}"
+        cluster: "{{ cluster }}"
+        operating_system: "rhel_7x64"
         type: server
         graphical_console:
           protocol:
-            - spice
             - vnc
         boot_devices:
           - hd
       async: 300
       poll: 15
+      register: vm_result
 
     - name: Assign NIC
       ovirt_nic:
-        auth: "{{ ovirt_auth }}"
         interface: virtio
-        mac_address: "{{ vm_mac_address }}"
         name: nic1
         profile: ovirtmgmt
         network: ovirtmgmt
         state: plugged
         vm: "{{ vm_name }}"
+      register: nic_result
 
-  handlers:    
-    - name: PXE Boot
-      ovirt_vm:
-        auth: "{{ ovirt_auth }}"
-        name: "{{ vm_name }}"
-        boot_devices:
-         - network
-        state: running
-      register: vm_build_result
-
-- name: Ensure Satellite is running and reachable
-  hosts: satellite
-  gather_facts: no
+- name: Prepare First Boot Resources
+  hosts: "{{ vm_name }}"
   connection: local
+  gather_facts: no
+
+  tasks:
+    - name: Create directory for initial boot files
+      tempfile:
+        state: directory
+      register: kstmpdir
+
+    - name: Extract ISO files
+      community.general.iso_extract:
+        image: "{{ rhel_iso_path }}/{{ rhel_iso_filename }}"
+        dest: "{{ kstmpdir.path }}"
+        files:
+          - isolinux/vmlinuz
+          - isolinux/initrd.img
+
+# TODO Move out vars
+- name: Copy Files to Webserver
+  hosts: webserver.mgmt.toal.ca
+  become: yes
+  tasks:
+    - name: Generate Kickstart File
+      template:
+        src: templates/ks.cfg
+        dest: "/var/www/ks/{{ vm_name }}.cfg"
+
+- name: Prepare Hypervisor
+  hosts: "{{ vm_host }}"
+  tasks:
+    - name: Temporary Directory
+      file:
+        path: "/tmp/{{ vm_name }}"
+        state: directory
+        mode: 0755
+
+    - name: Transfer files to Hypervisor
+      copy:
+        src: "{{ hostvars[vm_name].kstmpdir.path }}/{{ item }}"
+        dest: "/tmp/{{ vm_name }}/{{ item }}"
+      loop:
+        - vmlinuz
+        - initrd.img
+
+# NOTE: This is not idempotent
+- name: First Boot
+  hosts: localhost
+  gather_facts: no
   vars:
     # Hack to work around virtualenv python interpreter
     ansible_python_interpreter: "{{ ansible_playbook_python }}"
- 
-  tasks: 
-    - name: VM is running
+
+  tasks:
+    - block:
+      - name: Start VM with first-boot parameters
+        ovirt_vm:
+          name: "{{ vm_name }}"
+          host: "{{ vm_host }}"
+          kernel_params_persist: false
+          cd_iso: "{{ iso_disk.id }}"
+          kernel_path: "/tmp/{{ vm_name }}/vmlinuz"
+          kernel_params: "ks=http://192.168.1.199/ks/{{ vm_name }}.cfg inst.stage2=hd:LABEL=RHEL-7.9\\x20Server.x86_64"
+          initrd_path: "/tmp/{{ vm_name }}/initrd.img"
+          state: running
+
+
+      - name: Wait for system to shut down after installation
+        ovirt_vm_info:
+          pattern: "name={{ vm_name }}"
+        register: vm_info
+        until: vm_info['ovirt_vms'][0]['status'] == "down"
+        delay: 20
+        retries: 60
+      when: hostvars[vm_name].vm_result.vm.status != 'up'
+
+    - name: Power up VM
       ovirt_vm:
-          auth: "{{ ovirt_auth }}"
+        name: "{{ vm_name }}"
+        state: running
+
+    - name: VM is running
+      connection: local
+      ovirt_vm:
           name: "{{ vm_name }}"
           state: running
           boot_devices:
           - hd
-      
+
+- name: Ensure Satellite is reachable
+  hosts: "{{ vm_name }}"
+  gather_facts: no
+
+  tasks: 
+    - name: Set authentication for bootstrap
+      no_log: True
+      set_fact:
+        ansible_ssh_user: "root"
+        ansible_ssh_pass: "{{ initial_root_pass }}"
+
     - name: Wait for SSH to be ready
       wait_for_connection:
         timeout: 1800
         sleep: 5
-        
-- name: Set up ipa-client
-  hosts: satellite
-  remote_user: root
-  vars:
-    ansible_ssh_pass: "{{ satellite_root_pass }}"
-  become: no
-  roles:
-    - alvaroaleman.freeipa-client 
-  pre_tasks:
-    - name: Register to RHSM and connect to Satellite Subscription.
-      tags: rhsm
+
+    - name: Register System to Red Hat
       redhat_subscription:
         state: present
-        auto_attach: yes
         username: "{{ rhn_username }}"
         password: "{{ rhn_password }}"
-        pool: "^Red Hat Satellite Infrastructure Subscription$"
+        # TODO This shouldn't be hard-coded
+        pool_ids: 8a85f99c727637ad0172e1ba2856736d
+
+- name: Set up IPA Client
+  hosts: "{{ vm_name }}"
+  become: yes
+  vars:
+    ipaclient_realm: IDM.TOAL.CA
+    ipaclient_mkhomedir: true
+    ipaclient_domain: "mgmt.toal.ca"
+    ipasssd_enable_dns_updates: true
+  collections:
+    - freeipa.ansible_freeipa
+  pre_tasks:
     - name: Set hostname
-      hostname: 
-        name: "{{ansible_host}}"
+      hostname:
+        name: "{{ vm_name }}"
+
+  roles:
+    - role: debian-freeipa-client
+      when: ansible_os_family == "Debian"
+    - role: ipaclient
+      state: present
+      when: ansible_os_family == "RedHat"
+
+- name: Set up Basic Lab Packages
+  hosts: "{{ vm_name }}"
+  become: yes
+  roles:
+    - role: toal-common
 
 - name: Configure Satellite Servers
-  hosts: satellite
+  hosts: "{{ vm_name }}"
   become: true
-  roles:
-    - ansible-role-redhat_satellite6_installation
-  pre_tasks:
-      # This could take a while, if we are creating the VM from scratch, and installing
-    # the base software
-
-    # - name: Required Satellite Repos
-    #   tags: rhsm
-    #   rhsm_repository:
-    #     name: "{{ item }}"
-    #     state: present
-    #   with_items:
-    #     - rhel-7-server-rpms 
-    #     - rhel-server-rhscl-7-rpms
-    #     - rhel-7-server-satellite-6.4-rpms
-    #     - rhel-7-server-satellite-maintenance-6-rpms
-    #     - rhel-7-server-ansible-2.6-rpms
-    #     - rhel-7-server-rh-common-rpms
-
-    - name: Ensure latest versions of packages
-      yum:
-        name: "*"
-        state: latest
-
-    - name: Chronyd Installed
-      yum:
-        name: chrony
-        state: latest
-      notify: Restart Chrony
-
-    - name: IdM Client
-      yum:
-        name: ipa-client
-        state: latest
-
-    - name: Latest Version of SOS
-      yum:
-        name: sos
-        state: latest
-
-# TODO: set this in Administer -> Settings -> Puppet Puppet out of sync disabled = Yes
-# Description: Disable host configuration status turning to out of sync for Puppet after report does not arrive within configured interval
-
-# TODO: Make this work
-# For now:
-# hammer user-group create --admin yes --name satellite_admins
-# hammer user-group external create  --name satellite_admins --user-group satellite_admins --auth-source-id 3
-
-# - name: Satellite configuration
-#   hosts: satellite
-#   gather_facts: no
-#   connection: local
-#   vars:
-#     # Hack to work around virtualenv python interpreter
-#     ansible_python_interpreter: "{{ ansible_playbook_python }}"
-
-#   tasks:
-#     - foreman:
-#         username: admin
-#         password: "{{satellite_deployment_admin_password}}"
-#         server_url: "https://{{satellite_deployment_hostname_full}}"
-#         entity: user-group
-#         params:
-#           name: satellite_admins
-#           admin: yes
-
-#     - foreman:
-#         username: admin
-#         password: "{{satellite_deployment_admin_password}}"
-#         server_url: "https://{{satellite_deployment_hostname_full}}"
-#         entity: 
-#         params:
-#           name: satellite_admins
-#           admin: yes

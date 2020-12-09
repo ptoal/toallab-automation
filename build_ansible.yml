@@ -23,6 +23,10 @@
             name: "{{ inventory_hostname }}_disk0"
             state: present
 
+      - name: VM Created
+
+
+
       - name: Add NIC to VM
         ovirt_nic:
           state: present

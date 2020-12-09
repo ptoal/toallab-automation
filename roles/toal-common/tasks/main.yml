@@ -47,12 +47,3 @@
     name: insights-client
     state: present
   when: ansible_distribution == "RedHat"
-
-- name: Performance Co-Pilot
-  yum:
-    name:
-     - pcp-system-tools
-     - pcp-zeroconf
-     - cockpit-pcp
-     - pcp-pmda-trace
-     - pcp-selinux
