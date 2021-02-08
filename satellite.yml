@@ -1,7 +1,9 @@
 # Playbook to install Satellite server on RHV
 
-- name: Prepare RHV for Build
-  hosts: localhost
+#TODO: Fix Partitioning, as /var/lib/pulp doesn't get it's own partition now.
+
+- name: Preflight Setup
+  hosts: "{{ vm_name }}"
   gather_facts: no
   tasks:
     - name: Obtain SSO token from username / password credentials
@@ -9,7 +11,34 @@
         url: "{{ ovirt_url }}"
         username: "{{ ovirt_username }}"
         password: "{{ ovirt_password }}"
+      delegate_to: localhost
 
+    - name: Add host to satellite group
+      add_host:
+        hostname: '{{ vm_name }}'
+        groups: satellite
+      changed_when: false
+
+    - name: Get VM Tags
+      ovirt.ovirt.ovirt_tag_info:
+        vm: "{{ vm_name }}"
+      register: vmtags_result
+      delegate_to: localhost
+      ignore_errors: true
+
+    - name: Add host to provisioned group
+      add_host:
+        hostname: '{{ vm_name }}'
+        groups: provisioned
+      when:
+        - vmtags_result.ovirt_tags is defined
+        - vmtags_result.ovirt_tags|length > 0
+        - "'provisioned' in vmtags_result.ovirt_tags|map(attribute='name')|list"
+
+- name: Build VM
+  hosts: "{{ vm_name }}:!provisioned"
+  gather_facts: no
+  tasks:
     - name: ISO is uploaded to RHV
       redhat.rhv.ovirt_disk:
         name: "{{ rhel_iso_filename }}"
@@ -21,21 +50,16 @@
         format: raw
         content_type: iso
       register: iso_disk
+      delegate_to: localhost
 
-- name: Create VMs
-  hosts: "{{ vm_name }}"
-  connection: local
-  gather_facts: no
-  # Never run this, unless specifically enabled
-  vars:
-    # Hack to work around virtualenv python interpreter
-    ansible_python_interpreter: "{{ ansible_playbook_python }}"
-
-  tasks:
     - name: Remove known_hosts entry
       known_hosts:
-        name: "{{ vm_name }}"
+        name: "{{ item }}"
         state: absent
+      loop:
+        - "{{ vm_name }}"
+        - "{{ ansible_host }}"
+      delegate_to: localhost
 
     - name: Create VM disk
       ovirt_disk:
@@ -49,6 +73,7 @@
         storage_domain: "ssdvdo0"
       async: 300
       poll: 15
+      delegate_to: localhost
 
     - name: Create Satellite VM in RHV
       ovirt_vm:
@@ -71,6 +96,7 @@
       async: 300
       poll: 15
       register: vm_result
+      delegate_to: localhost
 
     - name: Assign NIC
       ovirt_nic:
@@ -81,17 +107,13 @@
         state: plugged
         vm: "{{ vm_name }}"
       register: nic_result
+      delegate_to: localhost
 
-- name: Prepare First Boot Resources
-  hosts: "{{ vm_name }}"
-  connection: local
-  gather_facts: no
-
-  tasks:
     - name: Create directory for initial boot files
       tempfile:
         state: directory
       register: kstmpdir
+      delegate_to: localhost
 
     - name: Extract ISO files
       community.general.iso_extract:
@@ -100,25 +122,21 @@
         files:
           - isolinux/vmlinuz
           - isolinux/initrd.img
+      delegate_to: localhost
 
-# TODO Move out vars
-- name: Copy Files to Webserver
-  hosts: webserver.mgmt.toal.ca
-  become: yes
-  tasks:
     - name: Generate Kickstart File
       template:
         src: templates/ks.cfg
         dest: "/var/www/ks/{{ vm_name }}.cfg"
+      become: yes
+      delegate_to: webserver.mgmt.toal.ca
 
-- name: Prepare Hypervisor
-  hosts: "{{ vm_host }}"
-  tasks:
     - name: Temporary Directory
       file:
         path: "/tmp/{{ vm_name }}"
         state: directory
         mode: 0755
+      delegate_to: "{{ vm_host }}"
 
     - name: Transfer files to Hypervisor
       copy:
@@ -127,14 +145,12 @@
       loop:
         - vmlinuz
         - initrd.img
+      delegate_to: "{{ vm_host }}"
 
 # NOTE: This is not idempotent
 - name: First Boot
-  hosts: localhost
+  hosts: "{{ vm_name }}:!provisioned"
   gather_facts: no
-  vars:
-    # Hack to work around virtualenv python interpreter
-    ansible_python_interpreter: "{{ ansible_playbook_python }}"
 
   tasks:
     - block:
@@ -148,6 +164,7 @@
           kernel_params: "ks=http://192.168.1.199/ks/{{ vm_name }}.cfg inst.stage2=hd:LABEL=RHEL-7.9\\x20Server.x86_64"
           initrd_path: "/tmp/{{ vm_name }}/initrd.img"
           state: running
+        delegate_to: localhost
 
 
       - name: Wait for system to shut down after installation
@@ -157,22 +174,33 @@
         until: vm_info['ovirt_vms'][0]['status'] == "down"
         delay: 20
         retries: 60
+        delegate_to: localhost
+
       when: hostvars[vm_name].vm_result.vm.status != 'up'
 
     - name: Power up VM
       ovirt_vm:
         name: "{{ vm_name }}"
         state: running
+      delegate_to: localhost
 
     - name: VM is running
-      connection: local
       ovirt_vm:
           name: "{{ vm_name }}"
           state: running
           boot_devices:
           - hd
+      delegate_to: localhost
 
-- name: Ensure Satellite is reachable
+    - name: Set provisioned tag
+      ovirt_tag:
+        name: provisioned
+        vms:
+          - "{{ vm_name }}"
+        state: present
+      delegate_to: localhost
+
+- name: OS Preparation
   hosts: "{{ vm_name }}"
   gather_facts: no
 
@@ -196,6 +224,32 @@
         # TODO This shouldn't be hard-coded
         pool_ids: 8a85f99c727637ad0172e1ba2856736d
 
+    - name: Firewall
+      firewalld:
+        port: "{{ item }}"
+        state: enabled
+        permanent: yes
+      loop:
+        - "80/tcp"
+        - "81/tcp"
+        - "443/tcp"
+        - "5647/tcp"
+        - "8000/tcp"
+        - "8140/tcp"
+        - "9090/tcp"
+        - "53/udp"
+        - "53/tcp"
+        - "67/udp"
+        - "69/udp"
+        - "5000/tcp"
+      notify: Reload Firewall
+
+  handlers:
+    - name: Reload Firewall
+      service:
+        name: firewalld
+        state: reloaded
+
 - name: Set up IPA Client
   hosts: "{{ vm_name }}"
   become: yes
@@ -203,20 +257,20 @@
     ipaclient_realm: IDM.TOAL.CA
     ipaclient_mkhomedir: true
     ipaclient_domain: "mgmt.toal.ca"
-    ipasssd_enable_dns_updates: true
+    ipaclient_ssh_trust_dns: yes
+    ipaclient_all_ip_addresses: yes
+
   collections:
     - freeipa.ansible_freeipa
   pre_tasks:
-    - name: Set hostname
+    - name: Hostname is set
       hostname:
         name: "{{ vm_name }}"
-
   roles:
-    - role: debian-freeipa-client
-      when: ansible_os_family == "Debian"
     - role: ipaclient
       state: present
-      when: ansible_os_family == "RedHat"
+
+#TODO Automatically set up DNS GSSAPI per:  https://access.redhat.com/documentation/en-us/red_hat_satellite/6.8/html/installing_satellite_server_from_a_connected_network/configuring-external-services#configuring-external-idm-dns_satellite
 
 - name: Set up Basic Lab Packages
   hosts: "{{ vm_name }}"
@@ -224,6 +278,39 @@
   roles:
     - role: toal-common
 
-- name: Configure Satellite Servers
+- name: Install Satellite Servers
   hosts: "{{ vm_name }}"
   become: true
+
+  roles:
+    - role: jjaswanson4.install_satellite.install_satellite
+
+- name: Configure Satellite Servers
+  hosts: "{{ vm_name }}"
+  collections:
+    - jjaswanson4.configure_satellite
+
+  tasks:
+    - name: include configure_foreman role with katello independent pieces
+      include_role:
+        name: configure_satellite_foreman
+    - name: build satellite by organization
+      include_role:
+        name: configure_satellite_katello
+      loop_control:
+        loop_var: organization
+      loop: "{{ satellite.katello }}"
+    - name: do that again but for katello dependent pieces
+      include_role:
+        name: configure_satellite_foreman
+      vars:
+        requires_katello_content: true
+
+# - name: Customize Satellite Installation
+#   hosts: "{{ vm_name }}"
+
+#   collections:
+#     - freeipa.ansible_freeipa
+
+#   tasks:
+#     - name:

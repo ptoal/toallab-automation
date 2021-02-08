@@ -8,6 +8,7 @@ collections:
 
   - name: freeipa.ansible_freeipa  
     source: https://galaxy.ansible.com
+    version: 0.3.1  
 
   - name: ovirt.ovirt
     source: https://galaxy.ansible.com
@@ -19,4 +20,10 @@ collections:
     source: https://cloud.redhat.com/api/automation-hub/
 
   - name: community.general
+    source: https://galaxy.ansible.com
+
+  - name: jjaswanson4.install_satellite    
+    source: https://galaxy.ansible.com
+
+  - name: jjaswanson4.configure_satellite    
     source: https://galaxy.ansible.com

@@ -1,0 +1,6 @@
+---
+# Configure host interface and network switch
+# First use-case is bond's
+#
+- name: Host Network
+  hosts: "{{  }}"

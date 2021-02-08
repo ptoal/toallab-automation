@@ -30,3 +30,13 @@
   become: yes
   roles:
     - role: toal-common
+
+- name: Packages
+  hosts: all
+  become: yes
+  tasks:
+
+    - name: Host Packages
+      package:
+        state: present
+        name: "{{ host_packages }}"
