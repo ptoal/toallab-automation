@@ -1,4 +1,0 @@
----
-# handlers file for sage905.mark2
-- name: Restart mark2
-  debug: msg="Restart Now!"

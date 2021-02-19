@@ -1,7 +1,0 @@
----
-# defaults file for sage905.mark2
-mark2_repo: "https://github.com/gsand/mark2.git"
-mark2_version: "master"
-mark2_keep_updated: true
-minecraft_user: minecraft
-minecraft_group: minecraft
