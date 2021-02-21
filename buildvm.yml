@@ -15,10 +15,13 @@
 - name: Ensure Primary IP exists and is in DNS
   hosts: tag_build
   gather_facts: false
+  collections:
+    - netbox.netbox
+    - freeipa.ansible_freeipa
 
   tasks:
     - name: Get unused IP Address from pool
-      netbox.netbox.netbox_ip_address:
+      netbox_ip_address:
         netbox_url: "{{ netbox_api }}"
         netbox_token: "{{ netbox_token }}"
         data:
@@ -28,6 +31,14 @@
       when: primary_ipv4 is undefined
       delegate_to: localhost
 
+    - name: Obtain SSO token for RHV
+      ovirt_auth:
+        url: "{{ ovirt_url }}"
+        username: "{{ ovirt_username }}"
+        insecure: true
+        password: "{{ ovirt_password }}"
+      delegate_to: localhost
+
     - set_fact:
         primary_ipv4: "{{ new_ip.ip_address.address|ipaddr('address') }}"
         vm_hostname: "{{ inventory_hostname.split('.')[0] }}"
@@ -35,8 +46,12 @@
       delegate_to: localhost
       when: primary_ipv4 is undefined
 
+    - name: Primary IPv4 Address
+      debug:
+        var: primary_ipv4
+
     - name: Ensure IP Address in IdM
-      freeipa.ansible_freeipa.ipadnsrecord:
+      ipadnsrecord:
         records:
           - name: "{{ vm_hostname }}"
             zone_name: "{{ vm_domain }}"
@@ -53,6 +68,7 @@
   gather_facts: no
   collections:
     - netbox.netbox
+    - ovirt.ovirt
   vars:
     # Workaround to get correct venv python interpreter
     ansible_python_interpreter: "{{ ansible_playbook_python }}"
@@ -69,7 +85,7 @@
            interface: virtio
            size: '{{ disk|default(40) }}'
            state: present
-           storage_domain: 'ssdvdo0'
+           storage_domain: "{{ rhv_storage_domain }}"
            activate: true
       when: vm_disks is not defined
 
@@ -159,5 +175,15 @@
       wait_for_connection:
         timeout: 1800
         sleep: 5
+
+    # - name: Ensure IP address is correct in Netbox
+    #   netbox_virtual_machine:
+    #     data:
+    #       name: "{{ inventory_hostname }}"
+    #       primary_ip4: "{{ primary_ipv4 }}"
+    #     netbox_url: "{{ netbox_api }}"
+    #     netbox_token: "{{ netbox_token }}"
+    #     state: present      
+    #   delegate_to: localhost
 
 #TODO: Clear Build tag
