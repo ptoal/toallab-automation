@@ -1,9 +1,0 @@
-[Unit]
-Description=PHP daemon to serve the Ansible deck
-
-[Service]
-ExecStart=/root/ansible-php-deck.sh
-
-[Install]
-WantedBy=multi-user.target
-

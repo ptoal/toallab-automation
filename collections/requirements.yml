@@ -6,9 +6,7 @@ collections:
   - name: netbox.netbox
     source: https://galaxy.ansible.com
 
-      #  - name: freeipa.ansible_freeipa
-
-  - name: ovirt.ovirt
+  - name: freeipa.ansible_freeipa
     source: https://galaxy.ansible.com
 
   - name: redhat.rhv
@@ -25,3 +23,6 @@ collections:
 
   - name: jjaswanson4.configure_satellite    
     source: https://galaxy.ansible.com
+
+  - name: redhat.satellite
+    source: https://cloud.redhat.com/api/automation-hub/

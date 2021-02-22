@@ -18,18 +18,9 @@
   collections:
     - netbox.netbox
     - freeipa.ansible_freeipa
+    - redhat.rhv
 
   tasks:
-    - name: Get unused IP Address from pool
-      netbox_ip_address:
-        netbox_url: "{{ netbox_api }}"
-        netbox_token: "{{ netbox_token }}"
-        data:
-          prefix: 192.168.16.0/20
-        state: new
-      register: new_ip
-      when: primary_ipv4 is undefined
-      delegate_to: localhost
 
     - name: Obtain SSO token for RHV
       ovirt_auth:
@@ -39,12 +30,35 @@
         password: "{{ ovirt_password }}"
       delegate_to: localhost
 
+    - name: Get unused IP Address from pool
+      netbox_ip_address:
+        netbox_url: "{{ netbox_api }}"
+        netbox_token: "{{ netbox_token }}"
+        data:
+          prefix: 192.168.90.0/24
+          assigned_object:
+            name: eth0
+            virtual_machine: "{{ inventory_hostname }}"
+        state: new
+      register: new_ip
+      when: primary_ipv4 is undefined
+      delegate_to: localhost
+
     - set_fact:
         primary_ipv4: "{{ new_ip.ip_address.address|ipaddr('address') }}"
         vm_hostname: "{{ inventory_hostname.split('.')[0] }}"
         vm_domain: "{{ inventory_hostname.split('.',1)[1] }}"
       delegate_to: localhost
       when: primary_ipv4 is undefined
+
+    - name: Primary IPv4 Assigned in Netbox
+      netbox_virtual_machine:
+        netbox_url: "{{ netbox_api }}"
+        netbox_token: "{{ netbox_token }}"
+        data:
+          primary_ip4: "{{ primary_ipv4 }}"
+          name: "{{ inventory_hostname }}"
+      delegate_to: localhost
 
     - name: Primary IPv4 Address
       debug:
@@ -68,7 +82,7 @@
   gather_facts: no
   collections:
     - netbox.netbox
-    - ovirt.ovirt
+    - redhat.rhv
   vars:
     # Workaround to get correct venv python interpreter
     ansible_python_interpreter: "{{ ansible_playbook_python }}"
@@ -95,7 +109,7 @@
         name: '{{ item.name }}'
         description: '{{ item.descr }}'
         interface: '{{ item.interface }}'
-        size: '{{ item.size }}'
+        size: '{{ item.size|int * 1024000 }}'
         state: '{{ item.state }}'
         sparse: '{{ item.sparse }}'
         wait: true
@@ -103,7 +117,6 @@
       async: 300
       poll: 15
       loop: '{{ vm_disks }}'
-
 
     - set_fact:
         nb_query_filter: "slug={{ platform }}"
@@ -130,6 +143,8 @@
           - hd
       async: 300
       poll: 15
+      notify: PXE Boot
+      register: vm_result
 
     - name: Assign NIC
       ovirt_nic:
@@ -137,12 +152,38 @@
         interface: virtio
         mac_address: '{{ item.mac_address|default(omit) }}'
         name: '{{ item.name }}'
-        profile: ovirtmgmt
+        profile: '{{ item.untagged_vlan.name }}'
         network: '{{ item.untagged_vlan.name }}' # This is fragile
         state: '{{ (item.enabled == True) |ternary("plugged","unplugged") }}'
         linked: yes
         vm: '{{ inventory_hostname }}'
       loop: '{{ interfaces }}'
+      register: interface_result
+
+
+    - name: Host configured in Satellite
+      redhat.satellite.host:
+        username: "{{ satellite_admin_user }}"
+        password: "{{ satellite_admin_pass }}"
+        server_url: "{{ satellite_url }}"
+        name: "{{ inventory_hostname }}"
+        hostgroup: "RHEL8/Management"
+        organization: Toal.ca
+        location: Lab
+        ip: "{{ primary_ipv4 }}"
+        mac: "{{ interface_result.results[0].nic.mac.address }}" #fragile
+        build: "{{ vm_result.changed |ternary(true,false) }}"
+        validate_certs: no
+
+    - name: Assign interface MACs to Netbox
+      netbox_vm_interface:
+        netbox_url: "{{ netbox_api }}"
+        netbox_token: "{{ netbox_token }}"
+        data:
+          name: "{{ item.nic.name }}"
+          mac_address: "{{ item.nic.mac.address }}"
+          virtual_machine: "{{ inventory_hostname }}"
+      loop: "{{ interface_result.results }}"
 
   handlers:
     - name: PXE Boot
@@ -158,6 +199,8 @@
   hosts: tag_build
   gather_facts: no
   connection: local
+  collections:
+    - redhat.rhv
   vars:
     # Hack to work around virtualenv python interpreter
     ansible_python_interpreter: "{{ ansible_playbook_python }}"
