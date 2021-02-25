@@ -35,7 +35,7 @@
         netbox_url: "{{ netbox_api }}"
         netbox_token: "{{ netbox_token }}"
         data:
-          prefix: 192.168.90.0/24
+          prefix: 192.168.16.0/20
           assigned_object:
             name: eth0
             virtual_machine: "{{ inventory_hostname }}"
@@ -160,6 +160,7 @@
       loop: '{{ interfaces }}'
       register: interface_result
 
+    - debug: var=interface_result 
 
     - name: Host configured in Satellite
       redhat.satellite.host:
@@ -168,7 +169,7 @@
         server_url: "{{ satellite_url }}"
         name: "{{ inventory_hostname }}"
         hostgroup: "RHEL8/RHEL8 Sandbox"
-        organization: Toal_ca
+        organization: Toal.ca
         location: Lab
         ip: "{{ primary_ipv4 }}"
         mac: "{{ interface_result.results[0].nic.mac.address }}" #fragile
