@@ -167,8 +167,8 @@
         password: "{{ satellite_admin_pass }}"
         server_url: "{{ satellite_url }}"
         name: "{{ inventory_hostname }}"
-        hostgroup: "RHEL8/Management"
-        organization: Toal.ca
+        hostgroup: "RHEL8/RHEL8 Sandbox"
+        organization: Toal_ca
         location: Lab
         ip: "{{ primary_ipv4 }}"
         mac: "{{ interface_result.results[0].nic.mac.address }}" #fragile
