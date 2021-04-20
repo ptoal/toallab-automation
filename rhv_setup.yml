@@ -1,18 +1,29 @@
 ---
+- name: Check for existing cert
+  hosts: rhv.mgmt.toal.ca
+  connection: local
+
+  tasks:
+    - name: Information from existing key
+      community.crypto.x509_certificate_info:
+        path: "keys/{{ acme_certificate_domains|first }}.pem"
+      ignore_errors: yes
+      register: key_info
+
+    - set_fact:
+        have_valid_cert: "{{ (key_info.not_after|to_datetime('%Y%m%d%H%M%SZ')).timestamp() > ansible_date_time.epoch|int + 2592000 }}"
+      when:
+        - not key_info.failed 
+
 # Probably want to split this out into a proper certificate management role for Toal.ca
 - name: Request TLS Certificate from LetsEncrypt
-  hosts: localhost
+  hosts: rhv.mgmt.toal.ca
   connection: local
   gather_facts: false
   # This doesn't belong here
   vars:
-    acme_email: ptoal@takeflight.ca
-    challenge: dns-01
-    dns_provider: dme
-    root_certificate: https://letsencrypt.org/certs/trustid-x3-root.pem.txt
-    domains:
-      - rhv.mgmt.toal.ca
-      - rhv.lan.toal.ca
+    acme_certificate_root_certificate: https://letsencrypt.org/certs/trustid-x3-root.pem.txt
+
 
   pre_tasks:
     - name: Ensure Let's Encrypt Account Exists
@@ -25,18 +36,41 @@
             - mailto:ptoal@takeflight.ca
           account_key_content: "{{ acme_key }}"
           acme_version: 2
-  roles:
-    - acme-certificate
 
+    - name: tmpfile for Account Key
+      tempfile:
+        state: file
+      register: acme_tmp_key
+
+    - name: Account Key to File
+      copy:
+        dest: "{{ acme_tmp_key.path }}"
+        content: "{{ acme_key }}"
+        mode: "600"
+
+    - set_fact: 
+        acme_certificate_acme_account: "{{ acme_tmp_key.path }}"
+
+  roles:
+    - name: felixfontein.acme_certificate
+      when: not have_valid_cert
+
+  post_tasks:
+    - name: Remove tempfile
+      file:
+        path: "{{ acme_tmp_key.path }}"
+        state: absent
 
 - name: Install custom CA Certificate in RHV-M
   hosts: rhv.mgmt.toal.ca
   become: true
+  vars:
+    key_files_prefix: "keys/{{ acme_certificate_domains|first }}"
 
   tasks:
     - name: Certificate trust in store
       copy:
-        src: "{{ acme_rootchain_file }}"
+        src: "{{ key_files_prefix}}-rootchain.pem"
         dest: /etc/pki/ca-trust/source/anchors/
       register: rootchain_result
       notify: restart httpd
@@ -48,21 +82,21 @@
 
     - name: CA Rootchain in Apache config
       copy:
-        src: "{{ acme_rootchain_file }}"
+        src: "{{ key_files_prefix }}-rootchain.pem"
         dest: /etc/pki/ovirt-engine/apache-ca.pem
         backup: yes
       notify: restart httpd
 
     - name: Private key installed
       copy:
-        src: "{{ acme_key_file }}"
+        src: "{{ key_files_prefix }}.key"
         dest: /etc/pki/ovirt-engine/keys/apache.key.nopass
         backup: yes
       notify: restart httpd
 
     - name: Certificate installed
       copy:
-        src: "{{ acme_cert_file }}"
+        src: "{{ key_files_prefix }}.pem"
         dest: /etc/pki/ovirt-engine/certs/apache.cer
         backup: yes
       notify: restart httpd
@@ -114,6 +148,13 @@
     # Hack to work around virtualenv python interpreter
     ansible_python_interpreter: "{{ ansible_playbook_python }}"
   tasks:
+    - name: Obtain SSO token for RHV
+      ovirt_auth:
+        url: "{{ ovirt_url }}"
+        username: "{{ ovirt_username }}"
+        insecure: true
+        password: "{{ ovirt_password }}"
+
     - ovirt_network:
         auth: "{{ ovirt_auth }}"
         fetch_nested: true
