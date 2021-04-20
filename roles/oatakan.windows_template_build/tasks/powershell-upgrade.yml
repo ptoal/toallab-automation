@@ -1,7 +1,9 @@
 ---
 
+- include_tasks: enable_tls_system_default.yml
+
 - name: download script
-  raw: '(New-Object -TypeName System.Net.WebClient).DownloadFile("{{ powershell_script_url }}", "{{ powershell_upgrade_script_file }}")'
+  raw: '[Net.ServicePointManager]::SecurityProtocol = [Enum]::ToObject([Net.SecurityProtocolType], 3072); (New-Object -TypeName System.Net.WebClient).DownloadFile("{{ powershell_script_url }}", "{{ powershell_upgrade_script_file }}")'
   changed_when: False
   check_mode: no
   register: download_script
@@ -13,12 +15,12 @@
   ignore_errors: yes
 
 - name: delete scheduled task if it exists
-  raw: 'SCHTASKS /Delete /TN upgrade'
+  raw: 'SCHTASKS /Delete /TN upgrade /f'
   args:
     executable: cmd.exe
   changed_when: False
   check_mode: no
-  ignore_errors: yes
+  failed_when: False
 
 - name: create a scheduled task to run powershell script
   raw: >
@@ -30,6 +32,15 @@
   changed_when: False
   check_mode: no
 
+- name: start windows update service
+  raw: net start wuauserv
+  args:
+    executable: cmd.exe
+  failed_when: false
+
+- pause:
+    seconds: 60
+
 - name: run scheduled task
   raw: 'SCHTASKS /Run /TN upgrade'
   args:
@@ -37,11 +48,30 @@
   changed_when: False
   check_mode: no
 
+- pause:
+    seconds: "{{ upgrade_wait_timeout }}"
+
+- name: wait for powershell upgrade task to finish
+  raw: '((schtasks /query /TN upgrade)[4] -split " +")[-2]'
+  changed_when: False
+  check_mode: no
+  register: upgrade_status_check
+  failed_when: false
+  until: (upgrade_status_check.stdout | trim | lower) == 'ready'
+  delay: 10
+  retries: 10
+
+- debug:
+    msg: "{{ powershell_target_version }}"
+
+# apply winrm memory hotfix for powershell 3.0
+- include_tasks: winrm-memfix.yml
+  when: powershell_target_version is version('3.0', '==')
+
 - name: wait for system to reboot after upgrade
   wait_for_connection:
-    delay: 300
-    sleep: 30
-    timeout: 300
+    sleep: 60
+    timeout: 400
 
 - name: delete scheduled task
   win_scheduled_task:

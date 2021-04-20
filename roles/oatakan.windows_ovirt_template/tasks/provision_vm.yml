@@ -1,7 +1,7 @@
 ---
 
 - name: provision a new vm
-  ovirt_vm:
+  ovirt.ovirt.ovirt_vm:
     auth: "{{ ovirt_auth }}"
     name: "{{ template.name }}"
     cluster: "{{ providers.ovirt.cluster|default('Default') }}"
@@ -9,6 +9,7 @@
     wait: yes
     memory: "{{ template.memory }}MiB"
     cpu_sockets: "{{ template.cpu }}"
+    bios_type: "{{ template.bios_type | default(omit) }}"
     boot_devices:
       - hd
       - cdrom
@@ -34,7 +35,7 @@
   delay: 10
 
 - name: create a disk
-  ovirt_disk:
+  ovirt.ovirt.ovirt_disk:
     auth: "{{ ovirt_auth }}"
     name: "{% if item.name_prefix | default(false) %}{{ template.name }}_{% endif %}{{ item.name }}"
     vm_name: "{{ template.name }}"
@@ -82,7 +83,7 @@
     - disks_creation.results is defined
 
 - name: assign tags to provisioned vms
-  ovirt_tag:
+  ovirt.ovirt.ovirt_tag:
     name: "{{ item }}_{{ instance.item.item[item] }}"
     vms: ["{{ instance.item.item.name }}"]
     state: attached
@@ -96,7 +97,7 @@
     - instance.item.item[item] is defined
 
 - name: start vm
-  ovirt_vm:
+  ovirt.ovirt.ovirt_vm:
     auth: "{{ ovirt_auth }}"
     name: "{{ template.name }}"
     cluster: "{{ providers.ovirt.cluster|default('Default') }}"

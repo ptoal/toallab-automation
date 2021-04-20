@@ -9,9 +9,16 @@
 - include_tasks: enable-tlsv12.yml
   when: upgrade_powershell | bool
 
+- include_tasks: update-agent-win2008.yml
+  when: "'Windows Server 2008' in ansible_distribution or 'Windows 7' in ansible_distribution"
+
+- include_tasks: security-update-win2012.yml
+  when: "'Windows Server 2012' in ansible_distribution or 'Windows 8' in ansible_distribution"
+
 - include_tasks: disable-auto-logon.yml
 
-- include_tasks: updates.yml
+- include_role:
+    name: "{{ windows_update_role }}"
   when: install_updates | bool
 
 - include_role:
@@ -35,7 +42,7 @@
 - include_tasks: policy.yml
 
 - include_tasks: power.yml
-  when: "'Windows 10' in ansible_distribution"
+  when: "'Server' not in ansible_distribution"
 
 - include_tasks: enable-rdp.yml
 
@@ -44,13 +51,14 @@
     - "'VMware' not in ansible_product_name"
     - "'VirtualBox' not in ansible_product_name"
     - ('KubeVirt' not in ansible_system_vendor | default(False))
+    - ('Red Hat' not in ansible_system_vendor | default(False))
     - not target_ovirt | bool
     - not target_vagrant | bool
 
 - include_tasks: remove-apps-alt-2.yml
   when:
     - remove_apps | bool
-    - "'Windows 10' in ansible_distribution"
+    - "'Server' not in ansible_distribution"
 
 - include_role:
     name: "{{ ec2_ena_driver_role }}"

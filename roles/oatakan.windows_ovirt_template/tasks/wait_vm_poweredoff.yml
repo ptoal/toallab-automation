@@ -1,7 +1,7 @@
 ---
 
 - name: wait for vm status to be poweredoff
-  ovirt_vm_info:
+  ovirt.ovirt.ovirt_vm_info:
     auth: "{{ ovirt_auth }}"
     pattern: name={{ template.name }} and cluster={{ providers.ovirt.cluster }}
   register: ovirt_vm_info_result

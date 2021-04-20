@@ -1,7 +1,7 @@
 ---
 
 - name: remove vm
-  ovirt_vm:
+  ovirt.ovirt.ovirt_vm:
     auth: "{{ ovirt_auth }}"
     cluster: "{{ providers.ovirt.cluster }}"
     name: "{{ template.name }}"

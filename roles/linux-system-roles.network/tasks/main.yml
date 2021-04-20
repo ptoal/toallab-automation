@@ -23,6 +23,23 @@
     state: present
   when:
     - not network_packages is subset(ansible_facts.packages.keys())
+  register: __network_package_install
+
+# If network packages changed and wireless or team connections are specified,
+# NetworkManager must be restarted
+- name: Restart NetworkManager due to wireless or team interfaces
+  service:
+    name: NetworkManager
+    state: restarted
+  when:
+    - __network_wireless_connections_defined
+       or __network_team_connections_defined
+    - network_provider == "nm"
+    - network_allow_restart
+    # ansible-lint wants this to be a handler, but this is not appropriate as
+    # NetworkManager must be restarted prior to the connections being created.
+    # see (https://docs.ansible.com/ansible-lint/rules/default_rules.html)
+    - __network_package_install.changed  # noqa 503
 
 - name: Enable and start NetworkManager
   service:
@@ -31,6 +48,18 @@
     enabled: true
   when:
     - network_provider == "nm"
+  no_log: true
+
+# If any 802.1x connections are used, the wpa_supplicant
+# service is required to be running
+- name: Enable and start wpa_supplicant
+  service:
+    name: wpa_supplicant
+    state: started
+    enabled: true
+  when:
+    - network_provider == "nm"
+    - __network_wpa_supplicant_required
 
 - name: Enable network service
   service:
@@ -38,11 +67,13 @@
     enabled: true
   when:
     - network_provider == "initscripts"
+  no_log: true
 
 - name: Ensure initscripts network file dependency is present
   copy:
     dest: /etc/sysconfig/network
     content: "# Created by network system role"
+    mode: "0644"
     force: false
   when:
     - network_provider == "initscripts"
@@ -53,6 +84,11 @@
     ignore_errors: "{{ network_ignore_errors | default(omit) }}"
     force_state_change: "{{ network_force_state_change | default(omit) }}"
     connections: "{{ network_connections | default([]) }}"
+    __debug_flags: "{{ __network_debug_flags | default(omit) }}"
+  register: __network_connections_result
+
+- name: Show debug messages
+  debug: var=__network_connections_result
 
 - name: Re-test connectivity
   ping:

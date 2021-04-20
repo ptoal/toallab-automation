@@ -1,13 +1,13 @@
 ---
 
 - name: get the datacenter name
-  ovirt_datacenter_info:
+  ovirt.ovirt.ovirt_datacenter_info:
     auth: "{{ ovirt_auth }}"
     pattern: "Clusters.name = {{ providers.ovirt.cluster }}"
   register: datacenter_info
 
 - name: get storage information
-  ovirt_storage_domain_info:
+  ovirt.ovirt.ovirt_storage_domain_info:
     auth: "{{ ovirt_auth }}"
     pattern: "datacenter={{ datacenter_info.ovirt_datacenters[0].name }}"
   register: storage_info
@@ -29,7 +29,7 @@
     the_query: "[?type=='iso']"
 
 - name: check if template already exists
-  ovirt_template_info:
+  ovirt.ovirt.ovirt_template_info:
     auth: "{{ ovirt_auth }}"
     pattern: "name={{ template.name }} and datacenter={{ datacenter_info.ovirt_datacenters[0].name }}"
   register: template_info
@@ -48,7 +48,7 @@
     - template_info.ovirt_templates | length > 0
 
 - name: check iso file on data domain
-  ovirt_disk_info:
+  ovirt.ovirt.ovirt_disk_info:
     auth: "{{ ovirt_auth }}"
     pattern: "name={{ iso_file_name }}"
   register: ovirt_disk_main_iso

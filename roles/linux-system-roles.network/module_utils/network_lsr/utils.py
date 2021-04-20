@@ -2,13 +2,12 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # vim: fileencoding=utf8
 
-import os
 import socket
 import sys
 import uuid
 
 # pylint: disable=import-error, no-name-in-module
-from ansible.module_utils.network_lsr import MyError
+from ansible.module_utils.network_lsr import MyError  # noqa:E501
 
 
 class Util:
@@ -25,19 +24,31 @@ class Util:
         return default
 
     @staticmethod
-    def check_output(argv):
-        # subprocess.check_output is python 2.7.
-        with open("/dev/null", "wb") as DEVNULL:
-            import subprocess
+    def path_to_glib_bytes(path):
+        """
+        Converts a path to a GLib.Bytes object that can be accepted by NM
+        """
+        return Util.GLib().Bytes.new(("file://%s\x00" % path).encode("utf-8"))
 
-            env = os.environ.copy()
-            env["LANG"] = "C"
-            p = subprocess.Popen(argv, stdout=subprocess.PIPE, stderr=DEVNULL, env=env)
-            # FIXME: Can we assume this to always be UTF-8?
-            out = p.communicate()[0].decode("UTF-8")
-            if p.returncode != 0:
-                raise MyError("failure calling %s: exit with %s" % (argv, p.returncode))
-        return out
+    @staticmethod
+    def convert_passwd_flags_nm(secret_flags):
+        """
+        Converts an array of "secret flags" strings
+        to an integer represantion understood by NetworkManager
+        """
+
+        flag_int = 0
+
+        if "none" in secret_flags:
+            flag_int += 0
+        if "agent-owned" in secret_flags:
+            flag_int += 1
+        if "not-saved" in secret_flags:
+            flag_int += 2
+        if "not-required" in secret_flags:
+            flag_int += 4
+
+        return flag_int
 
     @classmethod
     def create_uuid(cls):
@@ -147,7 +158,7 @@ class Util:
 
         if not cls.GMainLoop_run(mainloop_timeout):
             cancellable.cancel()
-            raise MyError("failure to call %s.%s(): timeout" % object_, async_action)
+            raise MyError("failure to call %s.%s(): timeout" % (object_, async_action))
 
         success = user_data.get("success", None)
         if success is not None:
@@ -249,7 +260,8 @@ class Util:
     def mac_ntoa(mac):
         if mac is None:
             return None
-        return ":".join(["%02x" % c for c in mac])
+        # bytearray() is needed for python2 compatibility
+        return ":".join(["%02x" % c for c in bytearray(mac)])
 
     @staticmethod
     def mac_norm(mac_str, force_len=None):

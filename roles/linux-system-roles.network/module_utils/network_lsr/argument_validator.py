@@ -2,11 +2,15 @@
 # vim: fileencoding=utf8
 # SPDX-License-Identifier: BSD-3-Clause
 
+import posixpath
 import socket
+import re
 
 # pylint: disable=import-error, no-name-in-module
-from ansible.module_utils.network_lsr import MyError
-from ansible.module_utils.network_lsr.utils import Util
+from ansible.module_utils.network_lsr import MyError  # noqa:E501
+from ansible.module_utils.network_lsr.utils import Util  # noqa:E501
+
+UINT32_MAX = 0xFFFFFFFF
 
 
 class ArgUtil:
@@ -28,26 +32,27 @@ class ArgUtil:
         return c
 
     @staticmethod
-    def connection_find_master(name, connections, n_connections=None):
+    def connection_find_controller(name, connections, n_connections=None):
         c = ArgUtil.connection_find_by_name(name, connections, n_connections)
         if not c:
-            raise MyError("invalid master/parent '%s'" % (name))
+            raise MyError("invalid controller/parent '%s'" % (name))
         if c["interface_name"] is None:
             raise MyError(
-                "invalid master/parent '%s' which needs an 'interface_name'" % (name)
+                "invalid controller/parent '%s' which needs an 'interface_name'"
+                % (name)
             )
         if not Util.ifname_valid(c["interface_name"]):
             raise MyError(
-                "invalid master/parent '%s' with invalid 'interface_name' ('%s')"
+                "invalid controller/parent '%s' with invalid 'interface_name' ('%s')"
                 % (name, c["interface_name"])
             )
         return c["interface_name"]
 
     @staticmethod
-    def connection_find_master_uuid(name, connections, n_connections=None):
+    def connection_find_controller_uuid(name, connections, n_connections=None):
         c = ArgUtil.connection_find_by_name(name, connections, n_connections)
         if not c:
-            raise MyError("invalid master/parent '%s'" % (name))
+            raise MyError("invalid controller/parent '%s'" % (name))
         return c["nm.uuid"]
 
     @staticmethod
@@ -92,17 +97,69 @@ class ArgValidator:
             return self.default_value
 
     def validate(self, value):
+        """
+        Validate and normalize the input dictionary
+
+        This validate @value or raises a ValidationError() on error.
+        It also returns a normalized value, where the settings are
+        converted to appropriate types and default values set. You
+        should rely on the normalization to fill unspecified values
+        and resolve ambiguity.
+
+        You are implementing "types" of ArgValidator instances and
+        a major point of them is to implement a suitable validation and
+        normalization. The means for that is for subclasses to override
+        _validate_impl() and possibly _validate_post(). Some subclasses
+        support convenience arguments for simpler validation, like
+        ArgValidatorStr.enum_values or ArgValidatorNum.val_min.
+        Or ArgValidator.required which is honored by ArgValidatorDict
+        to determine whether a mandatory key is missing. Also,
+        ArgValidatorDict and ArgValidatorList have a nested parameter
+        which is an ArgValidator for the elements of the dictionary and list.
+        """
         return self._validate(value, self.name)
 
     def _validate(self, value, name):
+        """
+        The internal implementation for validate().
+
+        This is mostly called from internal code and by validate().
+        Usually you would not call this directly nor override it.
+        Instead, you would implement either _validate_impl() or
+        _validate_post().
+        """
         validated = self._validate_impl(value, name)
         return self._validate_post(value, name, validated)
 
     def _validate_impl(self, value, name):
+        """
+        Implementation of validation.
+
+        Subclasses must implement this validation function. It is
+        the main hook to implement validate(). On validation error
+        it must raise ValidationError() or otherwise return a pre-normalized
+        value that gets passed to _validate_post().
+        """
         raise NotImplementedError()
 
     # pylint: disable=unused-argument,no-self-use
     def _validate_post(self, value, name, result):
+        """
+        Post validation of the validated result.
+
+        This will be called with the result from _validate_impl().
+        By default it does nothing, but subclasses can override
+        this to perform additional validation. The use for this
+        hook is to split the validation in two steps. When validating
+        a dictionary of multiple keys, then _validate_impl() can
+        implement the basic pre-validation and pre-normalization of the individual
+        keys (which can be in any order). Afterwards, _validate_post()
+        can take a more holistic view and validate interdependencies
+        between keys and perform additional validation. For example,
+        _validate_impl() would validate that the keys are of the correct
+        basic type, and _validate_post() would validate that the values
+        don't conflict and possibly normalize derived default values.
+        """
         return result
 
 
@@ -114,10 +171,28 @@ class ArgValidatorStr(ArgValidator):
         default_value=None,
         enum_values=None,
         allow_empty=False,
+        min_length=None,
+        max_length=None,
+        regex=None,
     ):
         ArgValidator.__init__(self, name, required, default_value)
         self.enum_values = enum_values
         self.allow_empty = allow_empty
+        self.regex = regex
+
+        if max_length is not None:
+            if not isinstance(max_length, int):
+                raise ValueError("max_length must be an integer")
+            elif max_length < 0:
+                raise ValueError("max_length must be a positive integer")
+        self.max_length = max_length
+
+        if min_length is not None:
+            if not isinstance(min_length, int):
+                raise ValueError("min_length must be an integer")
+            elif min_length < 0:
+                raise ValueError("min_length must be a positive integer")
+        self.min_length = min_length
 
     def _validate_impl(self, value, name):
         if not isinstance(value, Util.STRING_TYPE):
@@ -129,9 +204,43 @@ class ArgValidatorStr(ArgValidator):
                 "is '%s' but must be one of '%s'"
                 % (value, "' '".join(sorted(self.enum_values))),
             )
+        if self.regex is not None and not any(re.match(x, value) for x in self.regex):
+            raise ValidationError(
+                name,
+                "is '%s' which does not match the regex '%s'"
+                % (value, "' '".join(sorted(self.regex))),
+            )
         if not self.allow_empty and not value:
             raise ValidationError(name, "cannot be empty")
+        if not self._validate_string_max_length(value):
+            raise ValidationError(
+                name, "maximum length is %s characters" % (self.max_length)
+            )
+        if not self._validate_string_min_length(value):
+            raise ValidationError(
+                name, "minimum length is %s characters" % (self.min_length)
+            )
         return value
+
+    def _validate_string_max_length(self, value):
+        """
+        Ensures that the length of string `value` is less than or equal to
+        the maximum length
+        """
+        if self.max_length is not None:
+            return len(str(value)) <= self.max_length
+        else:
+            return True
+
+    def _validate_string_min_length(self, value):
+        """
+        Ensures that the length of string `value` is more than or equal to
+         the minimum length
+        """
+        if self.min_length is not None:
+            return len(str(value)) >= self.min_length
+        else:
+            return True
 
 
 class ArgValidatorNum(ArgValidator):
@@ -198,6 +307,12 @@ class ArgValidatorBool(ArgValidator):
         raise ValidationError(name, "must be an boolean but is '%s'" % (value))
 
 
+class ArgValidatorDeprecated:
+    def __init__(self, name, deprecated_by):
+        self.name = name
+        self.deprecated_by = deprecated_by
+
+
 class ArgValidatorDict(ArgValidator):
     def __init__(
         self,
@@ -221,26 +336,33 @@ class ArgValidatorDict(ArgValidator):
             items = list(value.items())
         except AttributeError:
             raise ValidationError(name, "invalid content is not a dictionary")
-        for (k, v) in items:
-            if k in seen_keys:
-                raise ValidationError(name, "duplicate key '%s'" % (k))
-            seen_keys.add(k)
-            validator = self.nested.get(k, None)
-            if validator is None:
-                raise ValidationError(name, "invalid key '%s'" % (k))
+        for (setting, value) in items:
             try:
-                vv = validator._validate(v, name + "." + k)
+                validator = self.nested[setting]
+            except KeyError:
+                raise ValidationError(name, "invalid key '%s'" % (setting))
+            if isinstance(validator, ArgValidatorDeprecated):
+                setting = validator.deprecated_by
+                validator = self.nested.get(setting, None)
+            if setting in seen_keys:
+                raise ValidationError(name, "duplicate key '%s'" % (setting))
+            seen_keys.add(setting)
+            try:
+                validated_value = validator._validate(value, name + "." + setting)
             except ValidationError as e:
                 raise ValidationError(e.name, e.error_message)
-            result[k] = vv
-        for (k, v) in self.nested.items():
-            if k in seen_keys:
+            result[setting] = validated_value
+        for (setting, validator) in self.nested.items():
+            if setting in seen_keys or isinstance(validator, ArgValidatorDeprecated):
                 continue
-            if v.required:
-                raise ValidationError(name, "missing required key '%s'" % (k))
-            vv = v.get_default_value()
-            if not self.all_missing_during_validate and vv is not ArgValidator.MISSING:
-                result[k] = vv
+            if validator.required:
+                raise ValidationError(name, "missing required key '%s'" % (setting))
+            default_value = validator.get_default_value()
+            if (
+                not self.all_missing_during_validate
+                and default_value is not ArgValidator.MISSING
+            ):
+                result[setting] = default_value
         return result
 
 
@@ -405,6 +527,22 @@ class ArgValidatorIPRoute(ArgValidatorDict):
 
 
 class ArgValidator_DictIP(ArgValidatorDict):
+    REGEX_DNS_OPTIONS = [
+        r"^attempts:([1-9]\d*|0)$",
+        r"^debug$",
+        r"^edns0$",
+        r"^ndots:([1-9]\d*|0)$",
+        r"^no-check-names$",
+        r"^no-reload$",
+        r"^no-tld-query$",
+        r"^rotate$",
+        r"^single-request$",
+        r"^single-request-reopen$",
+        r"^timeout:([1-9]\d*|0)$",
+        r"^trust-ad$",
+        r"^use-vc$",
+    ]
+
     def __init__(self):
         ArgValidatorDict.__init__(
             self,
@@ -417,6 +555,7 @@ class ArgValidator_DictIP(ArgValidatorDict):
                     "route_metric4", val_min=-1, val_max=0xFFFFFFFF, default_value=None
                 ),
                 ArgValidatorBool("auto6", default_value=None),
+                ArgValidatorBool("ipv6_disabled", default_value=None),
                 ArgValidatorIP("gateway6", family=socket.AF_INET6),
                 ArgValidatorNum(
                     "route_metric6", val_min=-1, val_max=0xFFFFFFFF, default_value=None
@@ -441,6 +580,13 @@ class ArgValidator_DictIP(ArgValidatorDict):
                     nested=ArgValidatorStr("dns_search[?]"),
                     default_value=list,
                 ),
+                ArgValidatorList(
+                    "dns_options",
+                    nested=ArgValidatorStr(
+                        "dns_options[?]", regex=ArgValidator_DictIP.REGEX_DNS_OPTIONS
+                    ),
+                    default_value=list,
+                ),
             ],
             default_value=lambda: {
                 "dhcp4": True,
@@ -448,6 +594,7 @@ class ArgValidator_DictIP(ArgValidatorDict):
                 "gateway4": None,
                 "route_metric4": None,
                 "auto6": True,
+                "ipv6_disabled": False,
                 "gateway6": None,
                 "route_metric6": None,
                 "address": [],
@@ -456,18 +603,50 @@ class ArgValidator_DictIP(ArgValidatorDict):
                 "rule_append_only": False,
                 "dns": [],
                 "dns_search": [],
+                "dns_options": [],
             },
         )
 
     def _validate_post(self, value, name, result):
+
+        has_ipv6_addresses = any(
+            [a for a in result["address"] if a["family"] == socket.AF_INET6]
+        )
+
+        if result["ipv6_disabled"] is True:
+            if result["auto6"] is True:
+                raise ValidationError(
+                    name, "'auto6' and 'ipv6_disabled' are mutually exclusive"
+                )
+            if has_ipv6_addresses:
+                raise ValidationError(
+                    name,
+                    "'ipv6_disabled' and static IPv6 addresses are mutually exclusive",
+                )
+            if result["gateway6"] is not None:
+                raise ValidationError(
+                    name, "'ipv6_disabled' and 'gateway6' are mutually exclusive"
+                )
+            if result["route_metric6"] is not None:
+                raise ValidationError(
+                    name, "'ipv6_disabled' and 'route_metric6' are mutually exclusive"
+                )
+        elif result["ipv6_disabled"] is None:
+            # "ipv6_disabled" is not explicitly set, we always set it to False.
+            # Either "auto6" is enabled or static addresses are set, then this
+            # is clearly correct.
+            # Even with "auto6:False" and no IPv6 addresses, we at least enable
+            # IPv6 link local addresses.
+            result["ipv6_disabled"] = False
+
         if result["dhcp4"] is None:
             result["dhcp4"] = result["dhcp4_send_hostname"] is not None or not any(
                 [a for a in result["address"] if a["family"] == socket.AF_INET]
             )
+
         if result["auto6"] is None:
-            result["auto6"] = not any(
-                [a for a in result["address"] if a["family"] == socket.AF_INET6]
-            )
+            result["auto6"] = not has_ipv6_addresses
+
         if result["dhcp4_send_hostname"] is not None:
             if not result["dhcp4"]:
                 raise ValidationError(
@@ -526,7 +705,10 @@ class ArgValidator_DictEthtool(ArgValidatorDict):
         ArgValidatorDict.__init__(
             self,
             name="ethtool",
-            nested=[ArgValidator_DictEthtoolFeatures()],
+            nested=[
+                ArgValidator_DictEthtoolFeatures(),
+                ArgValidator_DictEthtoolCoalesce(),
+            ],
             default_value=ArgValidator.MISSING,
         )
 
@@ -548,58 +730,274 @@ class ArgValidator_DictEthtoolFeatures(ArgValidatorDict):
             self,
             name="features",
             nested=[
-                ArgValidatorBool("esp-hw-offload", default_value=None),
-                ArgValidatorBool("esp-tx-csum-hw-offload", default_value=None),
-                ArgValidatorBool("fcoe-mtu", default_value=None),
+                ArgValidatorBool("esp_hw_offload", default_value=None),
+                ArgValidatorDeprecated(
+                    "esp-hw-offload", deprecated_by="esp_hw_offload"
+                ),
+                ArgValidatorBool("esp_tx_csum_hw_offload", default_value=None),
+                ArgValidatorDeprecated(
+                    "esp-tx-csum-hw-offload",
+                    deprecated_by="esp_tx_csum_hw_offload",
+                ),
+                ArgValidatorBool("fcoe_mtu", default_value=None),
+                ArgValidatorDeprecated("fcoe-mtu", deprecated_by="fcoe_mtu"),
                 ArgValidatorBool("gro", default_value=None),
                 ArgValidatorBool("gso", default_value=None),
                 ArgValidatorBool("highdma", default_value=None),
-                ArgValidatorBool("hw-tc-offload", default_value=None),
-                ArgValidatorBool("l2-fwd-offload", default_value=None),
+                ArgValidatorBool("hw_tc_offload", default_value=None),
+                ArgValidatorDeprecated("hw-tc-offload", deprecated_by="hw_tc_offload"),
+                ArgValidatorBool("l2_fwd_offload", default_value=None),
+                ArgValidatorDeprecated(
+                    "l2-fwd-offload", deprecated_by="l2_fwd_offload"
+                ),
                 ArgValidatorBool("loopback", default_value=None),
                 ArgValidatorBool("lro", default_value=None),
                 ArgValidatorBool("ntuple", default_value=None),
                 ArgValidatorBool("rx", default_value=None),
                 ArgValidatorBool("rxhash", default_value=None),
                 ArgValidatorBool("rxvlan", default_value=None),
-                ArgValidatorBool("rx-all", default_value=None),
-                ArgValidatorBool("rx-fcs", default_value=None),
-                ArgValidatorBool("rx-gro-hw", default_value=None),
-                ArgValidatorBool("rx-udp_tunnel-port-offload", default_value=None),
-                ArgValidatorBool("rx-vlan-filter", default_value=None),
-                ArgValidatorBool("rx-vlan-stag-filter", default_value=None),
-                ArgValidatorBool("rx-vlan-stag-hw-parse", default_value=None),
+                ArgValidatorBool("rx_all", default_value=None),
+                ArgValidatorDeprecated("rx-all", deprecated_by="rx_all"),
+                ArgValidatorBool("rx_fcs", default_value=None),
+                ArgValidatorDeprecated("rx-fcs", deprecated_by="rx_fcs"),
+                ArgValidatorBool("rx_gro_hw", default_value=None),
+                ArgValidatorDeprecated("rx-gro-hw", deprecated_by="rx_gro_hw"),
+                ArgValidatorBool("rx_udp_tunnel_port_offload", default_value=None),
+                ArgValidatorDeprecated(
+                    "rx-udp_tunnel-port-offload",
+                    deprecated_by="rx_udp_tunnel_port_offload",
+                ),
+                ArgValidatorBool("rx_vlan_filter", default_value=None),
+                ArgValidatorDeprecated(
+                    "rx-vlan-filter", deprecated_by="rx_vlan_filter"
+                ),
+                ArgValidatorBool("rx_vlan_stag_filter", default_value=None),
+                ArgValidatorDeprecated(
+                    "rx-vlan-stag-filter",
+                    deprecated_by="rx_vlan_stag_filter",
+                ),
+                ArgValidatorBool("rx_vlan_stag_hw_parse", default_value=None),
+                ArgValidatorDeprecated(
+                    "rx-vlan-stag-hw-parse",
+                    deprecated_by="rx_vlan_stag_hw_parse",
+                ),
                 ArgValidatorBool("sg", default_value=None),
-                ArgValidatorBool("tls-hw-record", default_value=None),
-                ArgValidatorBool("tls-hw-tx-offload", default_value=None),
+                ArgValidatorBool("tls_hw_record", default_value=None),
+                ArgValidatorDeprecated("tls-hw-record", deprecated_by="tls_hw_record"),
+                ArgValidatorBool("tls_hw_tx_offload", default_value=None),
+                ArgValidatorDeprecated(
+                    "tls-hw-tx-offload",
+                    deprecated_by="tls_hw_tx_offload",
+                ),
                 ArgValidatorBool("tso", default_value=None),
                 ArgValidatorBool("tx", default_value=None),
                 ArgValidatorBool("txvlan", default_value=None),
-                ArgValidatorBool("tx-checksum-fcoe-crc", default_value=None),
-                ArgValidatorBool("tx-checksum-ipv4", default_value=None),
-                ArgValidatorBool("tx-checksum-ipv6", default_value=None),
-                ArgValidatorBool("tx-checksum-ip-generic", default_value=None),
-                ArgValidatorBool("tx-checksum-sctp", default_value=None),
-                ArgValidatorBool("tx-esp-segmentation", default_value=None),
-                ArgValidatorBool("tx-fcoe-segmentation", default_value=None),
-                ArgValidatorBool("tx-gre-csum-segmentation", default_value=None),
-                ArgValidatorBool("tx-gre-segmentation", default_value=None),
-                ArgValidatorBool("tx-gso-partial", default_value=None),
-                ArgValidatorBool("tx-gso-robust", default_value=None),
-                ArgValidatorBool("tx-ipxip4-segmentation", default_value=None),
-                ArgValidatorBool("tx-ipxip6-segmentation", default_value=None),
-                ArgValidatorBool("tx-nocache-copy", default_value=None),
-                ArgValidatorBool("tx-scatter-gather", default_value=None),
-                ArgValidatorBool("tx-scatter-gather-fraglist", default_value=None),
-                ArgValidatorBool("tx-sctp-segmentation", default_value=None),
-                ArgValidatorBool("tx-tcp6-segmentation", default_value=None),
-                ArgValidatorBool("tx-tcp-ecn-segmentation", default_value=None),
-                ArgValidatorBool("tx-tcp-mangleid-segmentation", default_value=None),
-                ArgValidatorBool("tx-tcp-segmentation", default_value=None),
-                ArgValidatorBool("tx-udp-segmentation", default_value=None),
-                ArgValidatorBool("tx-udp_tnl-csum-segmentation", default_value=None),
-                ArgValidatorBool("tx-udp_tnl-segmentation", default_value=None),
-                ArgValidatorBool("tx-vlan-stag-hw-insert", default_value=None),
+                ArgValidatorBool("tx_checksum_fcoe_crc", default_value=None),
+                ArgValidatorDeprecated(
+                    "tx-checksum-fcoe-crc",
+                    deprecated_by="tx_checksum_fcoe_crc",
+                ),
+                ArgValidatorBool("tx_checksum_ipv4", default_value=None),
+                ArgValidatorDeprecated(
+                    "tx-checksum-ipv4",
+                    deprecated_by="tx_checksum_ipv4",
+                ),
+                ArgValidatorBool("tx_checksum_ipv6", default_value=None),
+                ArgValidatorDeprecated(
+                    "tx-checksum-ipv6",
+                    deprecated_by="tx_checksum_ipv6",
+                ),
+                ArgValidatorBool("tx_checksum_ip_generic", default_value=None),
+                ArgValidatorDeprecated(
+                    "tx-checksum-ip-generic",
+                    deprecated_by="tx_checksum_ip_generic",
+                ),
+                ArgValidatorBool("tx_checksum_sctp", default_value=None),
+                ArgValidatorDeprecated(
+                    "tx-checksum-sctp",
+                    deprecated_by="tx_checksum_sctp",
+                ),
+                ArgValidatorBool("tx_esp_segmentation", default_value=None),
+                ArgValidatorDeprecated(
+                    "tx-esp-segmentation",
+                    deprecated_by="tx_esp_segmentation",
+                ),
+                ArgValidatorBool("tx_fcoe_segmentation", default_value=None),
+                ArgValidatorDeprecated(
+                    "tx-fcoe-segmentation",
+                    deprecated_by="tx_fcoe_segmentation",
+                ),
+                ArgValidatorBool("tx_gre_csum_segmentation", default_value=None),
+                ArgValidatorDeprecated(
+                    "tx-gre-csum-segmentation",
+                    deprecated_by="tx_gre_csum_segmentation",
+                ),
+                ArgValidatorBool("tx_gre_segmentation", default_value=None),
+                ArgValidatorDeprecated(
+                    "tx-gre-segmentation",
+                    deprecated_by="tx_gre_segmentation",
+                ),
+                ArgValidatorBool("tx_gso_partial", default_value=None),
+                ArgValidatorDeprecated(
+                    "tx-gso-partial", deprecated_by="tx_gso_partial"
+                ),
+                ArgValidatorBool("tx_gso_robust", default_value=None),
+                ArgValidatorDeprecated("tx-gso-robust", deprecated_by="tx_gso_robust"),
+                ArgValidatorBool("tx_ipxip4_segmentation", default_value=None),
+                ArgValidatorDeprecated(
+                    "tx-ipxip4-segmentation",
+                    deprecated_by="tx_ipxip4_segmentation",
+                ),
+                ArgValidatorBool("tx_ipxip6_segmentation", default_value=None),
+                ArgValidatorDeprecated(
+                    "tx-ipxip6-segmentation",
+                    deprecated_by="tx_ipxip6_segmentation",
+                ),
+                ArgValidatorBool("tx_nocache_copy", default_value=None),
+                ArgValidatorDeprecated(
+                    "tx-nocache-copy",
+                    deprecated_by="tx_nocache_copy",
+                ),
+                ArgValidatorBool("tx_scatter_gather", default_value=None),
+                ArgValidatorDeprecated(
+                    "tx-scatter-gather",
+                    deprecated_by="tx_scatter_gather",
+                ),
+                ArgValidatorBool("tx_scatter_gather_fraglist", default_value=None),
+                ArgValidatorDeprecated(
+                    "tx-scatter-gather-fraglist",
+                    deprecated_by="tx_scatter_gather_fraglist",
+                ),
+                ArgValidatorBool("tx_sctp_segmentation", default_value=None),
+                ArgValidatorDeprecated(
+                    "tx-sctp-segmentation",
+                    deprecated_by="tx_sctp_segmentation",
+                ),
+                ArgValidatorBool("tx_tcp6_segmentation", default_value=None),
+                ArgValidatorDeprecated(
+                    "tx-tcp6-segmentation",
+                    deprecated_by="tx_tcp6_segmentation",
+                ),
+                ArgValidatorBool("tx_tcp_ecn_segmentation", default_value=None),
+                ArgValidatorDeprecated(
+                    "tx-tcp-ecn-segmentation",
+                    deprecated_by="tx_tcp_ecn_segmentation",
+                ),
+                ArgValidatorBool("tx_tcp_mangleid_segmentation", default_value=None),
+                ArgValidatorDeprecated(
+                    "tx-tcp-mangleid-segmentation",
+                    deprecated_by="tx_tcp_mangleid_segmentation",
+                ),
+                ArgValidatorBool("tx_tcp_segmentation", default_value=None),
+                ArgValidatorDeprecated(
+                    "tx-tcp-segmentation",
+                    deprecated_by="tx_tcp_segmentation",
+                ),
+                ArgValidatorBool("tx_udp_segmentation", default_value=None),
+                ArgValidatorDeprecated(
+                    "tx-udp-segmentation",
+                    deprecated_by="tx_udp_segmentation",
+                ),
+                ArgValidatorBool("tx_udp_tnl_csum_segmentation", default_value=None),
+                ArgValidatorDeprecated(
+                    "tx-udp_tnl-csum-segmentation",
+                    deprecated_by="tx_udp_tnl_csum_segmentation",
+                ),
+                ArgValidatorBool("tx_udp_tnl_segmentation", default_value=None),
+                ArgValidatorDeprecated(
+                    "tx-udp_tnl-segmentation",
+                    deprecated_by="tx_udp_tnl_segmentation",
+                ),
+                ArgValidatorBool("tx_vlan_stag_hw_insert", default_value=None),
+                ArgValidatorDeprecated(
+                    "tx-vlan-stag-hw-insert",
+                    deprecated_by="tx_vlan_stag_hw_insert",
+                ),
+            ],
+        )
+        self.default_value = dict(
+            [
+                (name, validator.default_value)
+                for name, validator in self.nested.items()
+                if not isinstance(validator, ArgValidatorDeprecated)
+            ]
+        )
+
+
+class ArgValidator_DictEthtoolCoalesce(ArgValidatorDict):
+    def __init__(self):
+        ArgValidatorDict.__init__(
+            self,
+            name="coalesce",
+            nested=[
+                ArgValidatorBool("adaptive_rx", default_value=None),
+                ArgValidatorBool("adaptive_tx", default_value=None),
+                ArgValidatorNum(
+                    "pkt_rate_high", val_min=0, val_max=UINT32_MAX, default_value=None
+                ),
+                ArgValidatorNum(
+                    "pkt_rate_low", val_min=0, val_max=UINT32_MAX, default_value=None
+                ),
+                ArgValidatorNum(
+                    "rx_frames", val_min=0, val_max=UINT32_MAX, default_value=None
+                ),
+                ArgValidatorNum(
+                    "rx_frames_high", val_min=0, val_max=UINT32_MAX, default_value=None
+                ),
+                ArgValidatorNum(
+                    "rx_frames_irq", val_min=0, val_max=UINT32_MAX, default_value=None
+                ),
+                ArgValidatorNum(
+                    "rx_frames_low", val_min=0, val_max=UINT32_MAX, default_value=None
+                ),
+                ArgValidatorNum(
+                    "rx_usecs", val_min=0, val_max=UINT32_MAX, default_value=None
+                ),
+                ArgValidatorNum(
+                    "rx_usecs_high", val_min=0, val_max=UINT32_MAX, default_value=None
+                ),
+                ArgValidatorNum(
+                    "rx_usecs_irq", val_min=0, val_max=UINT32_MAX, default_value=None
+                ),
+                ArgValidatorNum(
+                    "rx_usecs_low", val_min=0, val_max=UINT32_MAX, default_value=None
+                ),
+                ArgValidatorNum(
+                    "sample_interval",
+                    val_min=0,
+                    val_max=UINT32_MAX,
+                    default_value=None,
+                ),
+                ArgValidatorNum(
+                    "stats_block_usecs",
+                    val_min=0,
+                    val_max=UINT32_MAX,
+                    default_value=None,
+                ),
+                ArgValidatorNum(
+                    "tx_frames", val_min=0, val_max=UINT32_MAX, default_value=None
+                ),
+                ArgValidatorNum(
+                    "tx_frames_high", val_min=0, val_max=UINT32_MAX, default_value=None
+                ),
+                ArgValidatorNum(
+                    "tx_frames_irq", val_min=0, val_max=UINT32_MAX, default_value=None
+                ),
+                ArgValidatorNum(
+                    "tx_frames_low", val_min=0, val_max=UINT32_MAX, default_value=None
+                ),
+                ArgValidatorNum(
+                    "tx_usecs", val_min=0, val_max=UINT32_MAX, default_value=None
+                ),
+                ArgValidatorNum(
+                    "tx_usecs_high", val_min=0, val_max=UINT32_MAX, default_value=None
+                ),
+                ArgValidatorNum(
+                    "tx_usecs_irq", val_min=0, val_max=UINT32_MAX, default_value=None
+                ),
+                ArgValidatorNum(
+                    "tx_usecs_low", val_min=0, val_max=UINT32_MAX, default_value=None
+                ),
             ],
         )
         self.default_value = dict(
@@ -698,6 +1096,108 @@ class ArgValidator_DictMacvlan(ArgValidatorDict):
         return result
 
 
+class ArgValidatorPath(ArgValidatorStr):
+    """
+    Valides that the value is a valid posix absolute path
+    """
+
+    def __init__(self, name, required=False, default_value=None):
+        ArgValidatorStr.__init__(self, name, required, default_value, None)
+
+    def _validate_impl(self, value, name):
+        ArgValidatorStr._validate_impl(self, value, name)
+
+        if posixpath.isabs(value) is False:
+            raise ValidationError(
+                name,
+                "value '%s' is not a valid posix absolute path" % (value),
+            )
+        return value
+
+
+class ArgValidator_Dict802_1X(ArgValidatorDict):
+
+    VALID_EAP_TYPES = ["tls"]
+
+    VALID_PRIVATE_KEY_FLAGS = ["none", "agent-owned", "not-saved", "not-required"]
+
+    def __init__(self):
+        ArgValidatorDict.__init__(
+            self,
+            name="ieee802_1x",
+            nested=[
+                ArgValidatorStr(
+                    "eap",
+                    enum_values=ArgValidator_Dict802_1X.VALID_EAP_TYPES,
+                    default_value="tls",
+                ),
+                ArgValidatorStr("identity", required=True),
+                ArgValidatorPath("private_key", required=True),
+                ArgValidatorStr("private_key_password"),
+                ArgValidatorList(
+                    "private_key_password_flags",
+                    nested=ArgValidatorStr(
+                        "private_key_password_flags[?]",
+                        enum_values=ArgValidator_Dict802_1X.VALID_PRIVATE_KEY_FLAGS,
+                    ),
+                    default_value=None,
+                ),
+                ArgValidatorPath("client_cert", required=True),
+                ArgValidatorPath("ca_cert"),
+                ArgValidatorPath("ca_path"),
+                ArgValidatorBool("system_ca_certs", default_value=False),
+                ArgValidatorStr("domain_suffix_match", required=False),
+            ],
+            default_value=None,
+        )
+
+    def _validate_post(self, value, name, result):
+        if result["system_ca_certs"] is True and result["ca_path"] is not None:
+            raise ValidationError(
+                name,
+                "ca_path will be ignored by NetworkManager if system_ca_certs is used",
+            )
+        return result
+
+
+class ArgValidator_DictWireless(ArgValidatorDict):
+
+    VALID_KEY_MGMT = [
+        "wpa-psk",
+        "wpa-eap",
+    ]
+
+    def __init__(self):
+        ArgValidatorDict.__init__(
+            self,
+            name="wireless",
+            nested=[
+                ArgValidatorStr("ssid", max_length=32),
+                ArgValidatorStr(
+                    "key_mgmt", enum_values=ArgValidator_DictWireless.VALID_KEY_MGMT
+                ),
+                ArgValidatorStr("password", default_value=None, max_length=63),
+            ],
+            default_value=None,
+        )
+
+    def _validate_post(self, value, name, result):
+        if result["key_mgmt"] == "wpa-psk":
+            if result["password"] is None:
+                raise ValidationError(
+                    name,
+                    "must supply a password if using 'wpa-psk' key management",
+                )
+        else:
+            if result["password"] is not None:
+                raise ValidationError(
+                    name,
+                    "password only allowed if using 'wpa-psk' key management",
+                )
+
+        return result
+
+
 class ArgValidator_DictConnection(ArgValidatorDict):
 
     VALID_PERSISTENT_STATES = ["absent", "present"]
@@ -710,8 +1210,10 @@ class ArgValidator_DictConnection(ArgValidatorDict):
         "bond",
         "vlan",
         "macvlan",
+        "wireless",
+        "dummy",
     ]
-    VALID_SLAVE_TYPES = ["bridge", "bond", "team"]
+    VALID_PORT_TYPES = ["bridge", "bond", "team"]
 
     def __init__(self):
         ArgValidatorDict.__init__(
@@ -739,10 +1241,15 @@ class ArgValidator_DictConnection(ArgValidatorDict):
                 ),
                 ArgValidatorBool("autoconnect", default_value=True),
                 ArgValidatorStr(
-                    "slave_type",
-                    enum_values=ArgValidator_DictConnection.VALID_SLAVE_TYPES,
+                    "port_type",
+                    enum_values=ArgValidator_DictConnection.VALID_PORT_TYPES,
                 ),
-                ArgValidatorStr("master"),
+                ArgValidatorDeprecated(
+                    "slave_type",
+                    deprecated_by="port_type",
+                ),
+                ArgValidatorStr("controller"),
+                ArgValidatorDeprecated("master", deprecated_by="controller"),
                 ArgValidatorStr("interface_name", allow_empty=True),
                 ArgValidatorMac("mac"),
                 ArgValidatorNum(
@@ -759,6 +1266,8 @@ class ArgValidator_DictConnection(ArgValidatorDict):
                 ArgValidator_DictInfiniband(),
                 ArgValidator_DictVlan(),
                 ArgValidator_DictMacvlan(),
+                ArgValidator_Dict802_1X(),
+                ArgValidator_DictWireless(),
                 # deprecated options:
                 ArgValidatorStr(
                     "infiniband_transport_mode",
@@ -792,14 +1301,18 @@ class ArgValidator_DictConnection(ArgValidatorDict):
         """
         actions = []
         state = result.get("state")
-        if state in self.VALID_PERSISTENT_STATES:
-            del result["state"]
-            persistent_state_default = state
-            state = None
-        else:
-            persistent_state_default = None
+        persistent_state = result.get("persistent_state")
 
-        persistent_state = result.get("persistent_state", persistent_state_default)
+        if state in self.VALID_PERSISTENT_STATES:
+            if persistent_state:
+                raise ValidationError(
+                    name,
+                    "State cannot be '{0}' if persistent_state is specified".format(
+                        state
+                    ),
+                )
+            persistent_state = state
+            state = None
 
         # default persistent_state to present (not done via default_value in the
         # ArgValidatorStr, the value will only be set at the end of
@@ -807,22 +1320,18 @@ class ArgValidator_DictConnection(ArgValidatorDict):
         if not persistent_state:
             persistent_state = "present"
 
-        # If the profile is present, it should be ensured first
-        if persistent_state == "present":
-            actions.append(persistent_state)
-
         # If the profile should be absent at the end, it needs to be present in
-        # the meantime to allow to (de)activate it
-        if persistent_state == "absent" and state:
+        # the meantime to allow to (de)activate it. This is only possible if it
+        # is completely defined, for which `type` needs to be specified.
+        # Otherwise, downing is happening on a best-effort basis
+        if persistent_state == "absent" and state and result.get("type"):
             actions.append("present")
+
+        actions.append(persistent_state)
 
         # Change the runtime state if necessary
         if state:
             actions.append(state)
-
-        # Remove the profile in the end if requested
-        if persistent_state == "absent":
-            actions.append(persistent_state)
 
         result["state"] = state
         result["persistent_state"] = persistent_state
@@ -891,39 +1400,72 @@ class ArgValidator_DictConnection(ArgValidatorDict):
         self.VALID_FIELDS = valid_fields
         return result
 
+    def _validate_post_wireless(self, value, name, result):
+        """
+        Validate wireless settings
+        """
+        if "type" in result:
+            if result["type"] == "wireless":
+                if "wireless" in result:
+                    if (
+                        result["wireless"]["key_mgmt"] == "wpa-eap"
+                        and "ieee802_1x" not in result
+                    ):
+                        raise ValidationError(
+                            name + ".wireless",
+                            "key management set to wpa-eap but no "
+                            "'ieee802_1x' settings defined",
+                        )
+                else:
+                    raise ValidationError(
+                        name + ".wireless",
+                        "must define 'wireless' settings for 'type' 'wireless'",
+                    )
+
+            else:
+                if "wireless" in result:
+                    raise ValidationError(
+                        name + ".wireless",
+                        "'wireless' settings are not allowed for 'type' '%s'"
+                        % (result["type"]),
+                    )
+
+        return result
+
     def _validate_post(self, value, name, result):
         result = self._validate_post_state(value, name, result)
         result = self._validate_post_fields(value, name, result)
+        result = self._validate_post_wireless(value, name, result)
 
         if "type" in result:
 
-            if "master" in result:
-                if "slave_type" not in result:
-                    result["slave_type"] = None
-                if result["master"] == result["name"]:
+            if "controller" in result:
+                if "port_type" not in result:
+                    result["port_type"] = None
+                if result["controller"] == result["name"]:
                     raise ValidationError(
-                        name + ".master", '"master" cannot refer to itself'
+                        name + ".controller", '"controller" cannot refer to itself'
                     )
             else:
-                if "slave_type" in result:
+                if "port_type" in result:
                     raise ValidationError(
-                        name + ".slave_type",
-                        "'slave_type' requires a 'master' property",
+                        name + ".port_type",
+                        "'port_type' requires a 'controller' property",
                     )
 
             if "ip" in result:
-                if "master" in result:
+                if "controller" in result:
                     raise ValidationError(
-                        name + ".ip", 'a slave cannot have an "ip" property'
+                        name + ".ip", 'a port cannot have an "ip" property'
                     )
             else:
-                if "master" not in result:
+                if "controller" not in result:
                     result["ip"] = self.nested["ip"].get_default_value()
 
             if "zone" in result:
-                if "master" in result:
+                if "controller" in result:
                     raise ValidationError(
-                        name + ".zone", '"zone" cannot be configured for slave types'
+                        name + ".zone", '"zone" cannot be configured for port types'
                     )
             else:
                 result["zone"] = None
@@ -1109,13 +1651,23 @@ class ArgValidator_DictConnection(ArgValidatorDict):
                         % (result["type"]),
                     )
 
-        for k in self.VALID_FIELDS:
-            if k in result:
+            if "ieee802_1x" in result and result["type"] not in [
+                "ethernet",
+                "wireless",
+            ]:
+                raise ValidationError(
+                    name + ".ieee802_1x",
+                    "802.1x settings only allowed for ethernet or wireless interfaces.",
+                )
+
+        for name in self.VALID_FIELDS:
+            if name in result:
                 continue
-            v = self.nested[k]
-            vv = v.get_default_value()
-            if vv is not ArgValidator.MISSING:
-                result[k] = vv
+            validator = self.nested[name]
+            if not isinstance(validator, ArgValidatorDeprecated):
+                value = validator.get_default_value()
+                if value is not ArgValidator.MISSING:
+                    result[name] = value
 
         return result
 
@@ -1132,33 +1684,34 @@ class ArgValidator_ListConnections(ArgValidatorList):
     def _validate_post(self, value, name, result):
         for idx, connection in enumerate(result):
             if "type" in connection:
-                if connection["master"]:
+                if connection["controller"]:
                     c = ArgUtil.connection_find_by_name(
-                        connection["master"], result, idx
+                        connection["controller"], result, idx
                     )
                     if not c:
                         raise ValidationError(
-                            name + "[" + str(idx) + "].master",
-                            "references non-existing 'master' connection '%s'"
-                            % (connection["master"]),
+                            name + "[" + str(idx) + "].controller",
+                            "references non-existing 'controller' connection '%s'"
+                            % (connection["controller"]),
                         )
-                    if c["type"] not in ArgValidator_DictConnection.VALID_SLAVE_TYPES:
+                    if c["type"] not in ArgValidator_DictConnection.VALID_PORT_TYPES:
                         raise ValidationError(
-                            name + "[" + str(idx) + "].master",
-                            "references 'master' connection '%s' which is not a master "
-                            "type by '%s'" % (connection["master"], c["type"]),
+                            name + "[" + str(idx) + "].controller",
+                            "references 'controller' connection '%s' which is "
+                            "not a controller "
+                            "type by '%s'" % (connection["controller"], c["type"]),
                         )
-                    if connection["slave_type"] is None:
-                        connection["slave_type"] = c["type"]
-                    elif connection["slave_type"] != c["type"]:
+                    if connection["port_type"] is None:
+                        connection["port_type"] = c["type"]
+                    elif connection["port_type"] != c["type"]:
                         raise ValidationError(
-                            name + "[" + str(idx) + "].master",
-                            "references 'master' connection '%s' which is of type '%s' "
-                            "instead of slave_type '%s'"
+                            name + "[" + str(idx) + "].controller",
+                            "references 'controller' connection '%s' which is "
+                            "of type '%s' instead of port_type '%s'"
                             % (
-                                connection["master"],
+                                connection["controller"],
                                 c["type"],
-                                connection["slave_type"],
+                                connection["port_type"],
                             ),
                         )
                 if connection["parent"]:
@@ -1191,7 +1744,9 @@ class ArgValidator_ListConnections(ArgValidatorList):
             )
         ):
             try:
-                ArgUtil.connection_find_master(connection["parent"], connections, idx)
+                ArgUtil.connection_find_controller(
+                    connection["parent"], connections, idx
+                )
             except MyError:
                 raise ValidationError.from_connection(
                     idx,
@@ -1199,12 +1754,51 @@ class ArgValidator_ListConnections(ArgValidatorList):
                     "missing" % (connection["parent"]),
                 )
 
-        if (connection["master"]) and (mode == self.VALIDATE_ONE_MODE_INITSCRIPTS):
+        if (connection["controller"]) and (mode == self.VALIDATE_ONE_MODE_INITSCRIPTS):
             try:
-                ArgUtil.connection_find_master(connection["master"], connections, idx)
+                ArgUtil.connection_find_controller(
+                    connection["controller"], connections, idx
+                )
             except MyError:
                 raise ValidationError.from_connection(
                     idx,
-                    "profile references a master '%s' which has 'interface_name' "
-                    "missing" % (connection["master"]),
+                    "profile references a controller '%s' which has 'interface_name' "
+                    "missing" % (connection["controller"]),
+                )
+
+        # check if 802.1x connection is valid
+        if connection["ieee802_1x"]:
+            if mode == self.VALIDATE_ONE_MODE_INITSCRIPTS:
+                raise ValidationError.from_connection(
+                    idx,
+                    "802.1x authentication is not supported by initscripts. "
+                    "Configure 802.1x in /etc/wpa_supplicant.conf "
+                    "if you need to use initscripts.",
+                )
+
+        # check if wireless connection is valid
+        if connection["type"] == "wireless":
+            if mode == self.VALIDATE_ONE_MODE_INITSCRIPTS:
+                raise ValidationError.from_connection(
+                    idx,
+                    "Wireless WPA auth is not supported by initscripts. "
+                    "Configure wireless connection in /etc/wpa_supplicant.conf "
+                    "if you need to use initscripts.",
+                )
+
+        # initscripts does not support ip.dns_options, so raise errors when network
+        # provider is initscripts
+        if connection["ip"]["dns_options"]:
+            if mode == self.VALIDATE_ONE_MODE_INITSCRIPTS:
+                raise ValidationError.from_connection(
+                    idx,
+                    "ip.dns_options is not supported by initscripts.",
+                )
+        # initscripts does not support ip.ipv6_disabled, so raise errors when network
+        # provider is initscripts
+        if connection["ip"]["ipv6_disabled"]:
+            if mode == self.VALIDATE_ONE_MODE_INITSCRIPTS:
+                raise ValidationError.from_connection(
+                    idx,
+                    "ip.ipv6_disabled is not supported by initscripts.",
                 )

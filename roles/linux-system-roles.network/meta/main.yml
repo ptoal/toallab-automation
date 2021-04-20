@@ -5,7 +5,8 @@ galaxy_info:
   description: Configure networking
   company: Red Hat, Inc.
   license: BSD-3-Clause
-  min_ansible_version: 2.5
+  min_ansible_version: 2.7
+  github_branch: main
   galaxy_tags:
     - centos
     - fedora
@@ -17,9 +18,7 @@ galaxy_info:
   platforms:
     - name: Fedora
       versions:
-        - 28
-        - 29
-        - 30
+        - all
     - name: EL
       versions:
         - 6

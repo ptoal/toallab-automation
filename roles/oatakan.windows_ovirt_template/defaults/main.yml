@@ -1,5 +1,6 @@
 ---
 
+install_updates: yes
 instance_wait_retry_limit: 300
 instance_wait_connection_timeout: 400
 
@@ -14,8 +15,13 @@ enable_auto_logon: yes
 remove_vm_on_error: yes
 vm_failed: no
 
+custom_efi_enabled: no
+custom_efi_path: /usr/share/edk2.git/ovmf-x64/OVMF_CODE-pure-efi.fd
+
 virtio_iso_url: https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/archive-virtio/virtio-win-0.1.173-2/virtio-win.iso
 winrm_enable_script_url: https://raw.githubusercontent.com/ansible/ansible/devel/examples/scripts/ConfigureRemotingForAnsible.ps1
+
+set_network_to_private: '([Activator]::CreateInstance([Type]::GetTypeFromCLSID([Guid]"{DCB00C01-570F-4A9B-8D69-199FDBA5723B}"))).GetNetworkConnections() | % {$_.GetNetwork().SetCategory(1)}'
 
 windows_build_role: oatakan.windows_template_build
 

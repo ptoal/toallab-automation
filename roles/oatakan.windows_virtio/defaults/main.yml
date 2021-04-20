@@ -19,8 +19,17 @@ virtio_driver_directory: >-
         {% set virt_dir = '2k12R2' %}
       {% elif 'Windows Server 2008 R2' in ansible_distribution -%}
         {% set virt_dir = '2k8R2' %}
+      {% elif 'Windows 7' in ansible_distribution -%}
+        {% set virt_dir = 'w7' %}
       {% elif 'Windows 10' in ansible_distribution -%}
         {% set virt_dir = 'w10' %}
       {% else -%}
         {% set virt_dir = 'w10' %}
       {%- endif %}{{ virt_dir }}
+
+qxl_driver: >-
+      {% if 'Windows Server 2008 R2' in ansible_distribution or 'Windows 7' in ansible_distribution -%}
+        {% set qxl_driver_name = 'qxl' %}
+      {% else -%}
+        {% set qxl_driver_name = 'qxldod' %}
+      {%- endif %}{{ qxl_driver_name }}

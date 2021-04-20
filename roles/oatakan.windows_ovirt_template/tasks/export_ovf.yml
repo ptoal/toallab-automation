@@ -1,7 +1,7 @@
 ---
 
 - name: export template to export domain
-  ovirt_template:
+  ovirt.ovirt.ovirt_template:
     auth: "{{ ovirt_auth }}"
     state: exported
     name: "{{ template.name }}"

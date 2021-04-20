@@ -1,7 +1,7 @@
 ---
 
 - name: obtain SSO token with using username/password credentials
-  ovirt_auth:
+  ovirt.ovirt.ovirt_auth:
     url: "{{ lookup('env', 'OVIRT_URL')|default(ovirt.url) }}"
     username: "{{ lookup('env', 'OVIRT_USERNAME')|default(ovirt.username) }}"
     password: "{{ lookup('env', 'OVIRT_PASSWORD')|default(ovirt.password) }}"
@@ -62,7 +62,7 @@
           delegate_to: template_host
 
     - name: refresh SSO credentials
-      ovirt_auth:
+      ovirt.ovirt.ovirt_auth:
         url: "{{ lookup('env', 'OVIRT_URL')|default(ovirt.url) }}"
         username: "{{ lookup('env', 'OVIRT_USERNAME')|default(ovirt.username) }}"
         password: "{{ lookup('env', 'OVIRT_PASSWORD')|default(ovirt.password) }}"
@@ -77,7 +77,7 @@
 
   rescue:
     - name: refresh SSO credentials
-      ovirt_auth:
+      ovirt.ovirt.ovirt_auth:
         url: "{{ lookup('env', 'OVIRT_URL')|default(ovirt.url) }}"
         username: "{{ lookup('env', 'OVIRT_USERNAME')|default(ovirt.username) }}"
         password: "{{ lookup('env', 'OVIRT_PASSWORD')|default(ovirt.password) }}"
@@ -92,7 +92,7 @@
 
   always:
     - name: refresh SSO credentials
-      ovirt_auth:
+      ovirt.ovirt.ovirt_auth:
         url: "{{ lookup('env', 'OVIRT_URL')|default(ovirt.url) }}"
         username: "{{ lookup('env', 'OVIRT_USERNAME')|default(ovirt.username) }}"
         password: "{{ lookup('env', 'OVIRT_PASSWORD')|default(ovirt.password) }}"
@@ -109,7 +109,7 @@
         state: absent
 
     - name: logout from oVirt
-      ovirt_auth:
+      ovirt.ovirt.ovirt_auth:
         state: absent
         ovirt_auth: "{{ ovirt_auth }}"
 

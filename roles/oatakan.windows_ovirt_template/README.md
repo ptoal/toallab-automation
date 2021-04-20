@@ -25,6 +25,8 @@ A description of the settable variables for this role should go here, including 
 Dependencies
 ------------
 
+Import ovirt.ovirt collections.
+
 A list of roles that this role utilizes, make sure to call this out in requirements.yml file under roles directory or download manually:
 
 - oatakan.windows_template_build
@@ -34,6 +36,7 @@ Example Playbook
 
 Including an example of how to use your role (for instance, with variables passed in as parameters) is always nice for users too:
 
+    # import ovirt.ovirt collections
     - name: create a ovirt windows template
       hosts: all
       gather_facts: False

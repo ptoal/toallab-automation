@@ -2,7 +2,7 @@
 
 - block:
     - name: remove iso file from data_domain
-      ovirt_disk:
+      ovirt.ovirt.ovirt_disk:
         auth: "{{ ovirt_auth }}"
         name: "{{ iso_file }}"
         storage_domain: "{{ providers.ovirt.data_domain | default('data_domain') }}"
@@ -15,7 +15,7 @@
       when: ansible_version.full is version('2.9', '>=')
 
     - name: remove iso file from data_domain
-      ovirt_disk:
+      ovirt.ovirt.ovirt_disk:
         auth: "{{ ovirt_auth }}"
         name: "{{ iso_file }}"
         storage_domain: "{{ providers.ovirt.data_domain | default('data_domain') }}"

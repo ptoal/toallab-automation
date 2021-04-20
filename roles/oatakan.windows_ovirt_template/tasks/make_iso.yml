@@ -10,6 +10,15 @@
         src: "{{ windows_sysprep_template_folder }}/Autounattend.xml.j2"
         dest: "{{ temp_directory }}/ks_iso/Autounattend.xml"
 
+    - name: download ConfigureRemotingForAnsible.ps1 script
+      get_url:
+         url: "{{ winrm_enable_script_url }}"
+         dest: "{{ temp_directory }}/ks_iso/ConfigureRemotingForAnsible.ps1"
+      register: download_script
+      until: download_script is success
+      delay: 3
+      retries: 5
+
     - name: include virtio drivers
       include_tasks: virtio_drivers.yml
 

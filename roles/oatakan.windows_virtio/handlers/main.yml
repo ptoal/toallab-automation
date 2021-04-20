@@ -13,6 +13,6 @@
   when: virtio_iso_mount_drive | length == 0
   with_items:
     - "{{ ansible_env.TEMP }}\\redhat_balloon.cer"
-    - "{{ ansible_env.TEMP }}\\redhat_qxldod.cer"
+    - "{{ ansible_env.TEMP }}\\redhat_{{ qxl_driver }}.cer"
     - "{{ ansible_env.TEMP }}\\{{ virtio_win_iso_name }}"
     - "{{ ansible_env.TEMP }}\\virtio_iso_extract"

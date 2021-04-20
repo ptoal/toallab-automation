@@ -6,7 +6,7 @@
     virtio_win_virtio_path: "{{ (win_disk_image.mount_path | default(virtio_iso_mount_drive)) + '\\virtio' if virtio_win_ovirt else (win_disk_image.mount_path | default(virtio_iso_mount_drive)) }}"
     virtio_win_iso_name: "{{ virtio_win_iso_name }}"
   when:
-    - virtio_iso_mount_drive | length > 0 or ('Windows Server 2008' not in ansible_distribution)
+    - virtio_iso_mount_drive | length > 0 or ('Windows Server 2008' not in ansible_distribution and 'Windows 7' not in ansible_distribution)
 
 - name: Set the virtio_win_iso_path and virtio_win_virtio_path
   set_fact:
@@ -15,7 +15,7 @@
     virtio_win_iso_name: "{{ virtio_win_iso_name }}"
   when:
     - virtio_iso_mount_drive | length == 0
-    - ('Windows Server 2008' in ansible_distribution)
+    - ('Windows Server 2008' in ansible_distribution) or ('Windows 7' in ansible_distribution)
 
 - name: Get list of all drivers
   win_command: driverquery /V

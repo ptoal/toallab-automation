@@ -1,7 +1,7 @@
 ---
 
 - name: wait until the disk is unlocked by the oVirt engine
-  ovirt_disk_info:
+  ovirt.ovirt.ovirt_disk_info:
     auth: "{{ ovirt_auth }}"
     pattern: "name={{ iso_file }}"
   register: ovirt_disk_info

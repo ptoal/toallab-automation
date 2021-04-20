@@ -13,16 +13,29 @@
     state: present
     elements: "C:\\Program Files (x86)\\Windows Kits\\10\\Assessment and Deployment Kit\\Deployment Tools\\amd64\\DISM"
 
+- pause:
+    seconds: 10
+
 - name: download hotfix
   win_get_url:
     url: '{{ enable_tlsv12_hotfix.url }}'
     dest: '{{ enable_tlsv12_hotfix_download_location }}\{{ enable_tlsv12_hotfix.file }}'
+  register: download_hotfix
+  until: download_hotfix is success
+  delay: 3
+  retries: 5
 
-- name: install hotfix
+- name: install hotfix (PS >= 4)
   win_hotfix:
     source: '{{ enable_tlsv12_hotfix_download_location }}\{{ enable_tlsv12_hotfix.file }}'
     state: present
   register: hotfix_install
+  when: ansible_powershell_version is version('4', '>=')
+
+- name: install hotfix (PS == 3)
+  win_shell: '{{ enable_tlsv12_hotfix_download_location }}\{{ enable_tlsv12_hotfix.file }} /quiet /norestart'
+  register: hotfix_install
+  when: ansible_powershell_version is version('3', '==')
 
 - name: debug hotfix installation result
   debug:
@@ -35,7 +48,7 @@
 
 - name: reboot if needed
   win_reboot:
-  when: hotfix_install.reboot_required
+  when: hotfix_install.reboot_required | default(False)
 
 - name: enable TLSv1.2 support
   win_regedit:
@@ -59,10 +72,25 @@
       property: DisabledByDefault
       value: 0
 
+- name: enable strong crypto
+  win_regedit:
+    path: HKLM:\{{ item }}
+    name: SchUseStrongCrypto
+    data: 1
+    type: dword
+    state: present
+  loop:
+    - 'SOFTWARE\Microsoft\.NETFramework\v4.0.30319'
+    - 'SOFTWARE\WOW6432Node\Microsoft\.NETFramework\v4.0.30319'
+
 - name: ensure Windows ADK with DISM is removed
   win_chocolatey:
     name: windows-adk-deploy
     state: absent
+  register: remove_win_adk_dism
+  until: remove_win_adk_dism is success
+  delay: 3
+  retries: 5
 
 - name: reboot if TLS config was applied
   win_reboot:

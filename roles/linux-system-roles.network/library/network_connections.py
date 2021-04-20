@@ -2,25 +2,33 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: BSD-3-Clause
 
+import errno
 import functools
 import os
+import re
+import shlex
 import socket
+import subprocess
 import time
 import traceback
+import logging
 
 # pylint: disable=import-error, no-name-in-module
-from ansible.module_utils.network_lsr import MyError
+from ansible.module_utils.basic import AnsibleModule
+from ansible.module_utils.network_lsr import ethtool  # noqa:E501
+from ansible.module_utils.network_lsr import MyError  # noqa:E501
 
-# pylint: disable=import-error
-from ansible.module_utils.network_lsr.argument_validator import (
+from ansible.module_utils.network_lsr.argument_validator import (  # noqa:E501
     ArgUtil,
     ArgValidator_ListConnections,
     ValidationError,
 )
 
-# pylint: disable=import-error
-from ansible.module_utils.network_lsr.utils import Util
-from ansible.module_utils.network_lsr import nm_provider
+from ansible.module_utils.network_lsr.utils import Util  # noqa:E501
+from ansible.module_utils.network_lsr import nm_provider  # noqa:E501
+
+# pylint: enable=import-error, no-name-in-module
+
 
 DOCUMENTATION = """
 ---
@@ -39,8 +47,11 @@ options: Documentation needs to be written. Note that the network_connections
 
 
 ###############################################################################
+PERSISTENT_STATE = "persistent_state"
+ABSENT_STATE = "absent"
 
 DEFAULT_ACTIVATION_TIMEOUT = 90
+DEFAULT_TIMEOUT = 10
 
 
 class CheckMode:
@@ -56,6 +67,17 @@ class LogLevel:
     WARN = "warn"
     INFO = "info"
     DEBUG = "debug"
+
+    _LOGGING_LEVEL_MAP = {
+        logging.DEBUG: DEBUG,
+        logging.INFO: INFO,
+        logging.WARN: WARN,
+        logging.ERROR: ERROR,
+    }
+
+    @staticmethod
+    def from_logging_level(logging_level):
+        return LogLevel._LOGGING_LEVEL_MAP.get(logging_level, LogLevel.ERROR)
 
     @staticmethod
     def fmt(level):
@@ -103,16 +125,7 @@ class SysUtil:
 
     @staticmethod
     def _link_read_permaddress(ifname):
-        try:
-            out = Util.check_output(["ethtool", "-P", ifname])
-        except MyError:
-            return None
-        import re
-
-        m = re.match("^Permanent address: ([0-9A-Fa-f:]*)\n$", out)
-        if not m:
-            return None
-        return Util.mac_norm(m.group(1))
+        return ethtool.get_perm_addr(ifname)
 
     @staticmethod
     def _link_infos_fetch():
@@ -220,8 +233,6 @@ class IfcfgUtil:
     def KeyValid(cls, name):
         r = getattr(cls, "_CHECKSTR_VALID_KEY", None)
         if r is None:
-            import re
-
             r = re.compile("^[a-zA-Z][a-zA-Z0-9_]*$")
             cls._CHECKSTR_VALID_KEY = r
         return bool(r.match(name))
@@ -231,8 +242,6 @@ class IfcfgUtil:
 
         r = getattr(cls, "_re_ValueEscape", None)
         if r is None:
-            import re
-
             r = re.compile("^[a-zA-Z_0-9-.]*$")
             cls._re_ValueEscape = r
 
@@ -335,7 +344,7 @@ class IfcfgUtil:
                 ifcfg["PKEY"] = "yes"
                 ifcfg["PKEY_ID"] = str(connection["infiniband"]["p_key"])
                 if connection["parent"]:
-                    ifcfg["PHYSDEV"] = ArgUtil.connection_find_master(
+                    ifcfg["PHYSDEV"] = ArgUtil.connection_find_controller(
                         connection["parent"], connections, idx
                     )
         elif connection["type"] == "bridge":
@@ -352,7 +361,7 @@ class IfcfgUtil:
         elif connection["type"] == "vlan":
             ifcfg["VLAN"] = "yes"
             ifcfg["TYPE"] = "Vlan"
-            ifcfg["PHYSDEV"] = ArgUtil.connection_find_master(
+            ifcfg["PHYSDEV"] = ArgUtil.connection_find_controller(
                 connection["parent"], connections, idx
             )
             ifcfg["VID"] = str(connection["vlan"]["id"])
@@ -376,6 +385,7 @@ class IfcfgUtil:
         ethtool_features = connection["ethtool"]["features"]
         configured_features = []
         for feature, setting in ethtool_features.items():
+            feature = feature.replace("_", "-")
             value = ""
             if setting:
                 value = "on"
@@ -393,24 +403,44 @@ class IfcfgUtil:
                 " ".join(configured_features),
             )
 
+        ethtool_coalesce = connection["ethtool"]["coalesce"]
+        configured_coalesce = []
+        for coalesce, setting in ethtool_coalesce.items():
+            if setting is not None:
+                if isinstance(setting, bool):
+                    setting = int(setting)
+                configured_coalesce.append(
+                    "%s %s" % (coalesce.replace("_", "-"), setting)
+                )
+
+        if configured_coalesce:
+            if ethtool_options:
+                ethtool_options += " ; "
+            ethtool_options += "-C %s %s" % (
+                connection["interface_name"],
+                " ".join(configured_coalesce),
+            )
+
         if ethtool_options:
             ifcfg["ETHTOOL_OPTS"] = ethtool_options
 
-        if connection["master"] is not None:
-            m = ArgUtil.connection_find_master(connection["master"], connections, idx)
-            if connection["slave_type"] == "bridge":
+        if connection["controller"] is not None:
+            m = ArgUtil.connection_find_controller(
+                connection["controller"], connections, idx
+            )
+            if connection["port_type"] == "bridge":
                 ifcfg["BRIDGE"] = m
-            elif connection["slave_type"] == "bond":
+            elif connection["port_type"] == "bond":
                 ifcfg["MASTER"] = m
                 ifcfg["SLAVE"] = "yes"
-            elif connection["slave_type"] == "team":
+            elif connection["port_type"] == "team":
                 ifcfg["TEAM_MASTER"] = m
                 if "TYPE" in ifcfg:
                     del ifcfg["TYPE"]
                 if connection["type"] != "team":
                     ifcfg["DEVICETYPE"] = "TeamPort"
             else:
-                raise MyError("invalid slave_type '%s'" % (connection["slave_type"]))
+                raise MyError("invalid port_type '%s'" % (connection["port_type"]))
 
             if ip["route_append_only"] and content_current:
                 route4_file = content_current["route"]
@@ -449,9 +479,11 @@ class IfcfgUtil:
             else:
                 ifcfg["IPV6INIT"] = "no"
             if addrs6:
-                ifcfg["IPVADDR"] = addrs6[0]["address"] + "/" + str(addrs6[0]["prefix"])
+                ifcfg["IPV6ADDR"] = (
+                    addrs6[0]["address"] + "/" + str(addrs6[0]["prefix"])
+                )
                 if len(addrs6) > 1:
-                    ifcfg["IPVADDR_SECONDARIES"] = " ".join(
+                    ifcfg["IPV6ADDR_SECONDARIES"] = " ".join(
                         [a["address"] + "/" + str(a["prefix"]) for a in addrs6[1:]]
                     )
             if ip["gateway6"] is not None:
@@ -507,9 +539,6 @@ class IfcfgUtil:
     def ifcfg_parse_line(cls, line):
         r1 = getattr(cls, "_re_parse_line1", None)
         if r1 is None:
-            import re
-            import shlex
-
             r1 = re.compile("^[ \t]*([a-zA-Z_][a-zA-Z_0-9]*)=(.*)$")
             cls._re_parse_line1 = r1
             cls._shlex = shlex
@@ -596,8 +625,6 @@ class IfcfgUtil:
                 try:
                     os.unlink(path)
                 except OSError as e:
-                    import errno
-
                     if e.errno != errno.ENOENT:
                         raise
             else:
@@ -655,7 +682,7 @@ class NMUtil:
             connection.add_setting(setting)
         return setting
 
-    def device_is_master_type(self, dev):
+    def device_is_controller_type(self, dev):
         if dev:
             NM = Util.NM()
             GObject = Util.GObject()
@@ -799,7 +826,7 @@ class NMUtil:
                 if connection["parent"]:
                     s_infiniband.set_property(
                         NM.SETTING_INFINIBAND_PARENT,
-                        ArgUtil.connection_find_master(
+                        ArgUtil.connection_find_controller(
                             connection["parent"], connections, idx
                         ),
                     )
@@ -817,13 +844,17 @@ class NMUtil:
                 s_bond.add_option("miimon", str(connection["bond"]["miimon"]))
         elif connection["type"] == "team":
             s_con.set_property(NM.SETTING_CONNECTION_TYPE, NM.SETTING_TEAM_SETTING_NAME)
+        elif connection["type"] == "dummy":
+            s_con.set_property(
+                NM.SETTING_CONNECTION_TYPE, NM.SETTING_DUMMY_SETTING_NAME
+            )
         elif connection["type"] == "vlan":
             s_con.set_property(NM.SETTING_CONNECTION_TYPE, NM.SETTING_VLAN_SETTING_NAME)
             s_vlan = self.connection_ensure_setting(con, NM.SettingVlan)
             s_vlan.set_property(NM.SETTING_VLAN_ID, connection["vlan"]["id"])
             s_vlan.set_property(
                 NM.SETTING_VLAN_PARENT,
-                ArgUtil.connection_find_master_uuid(
+                ArgUtil.connection_find_controller_uuid(
                     connection["parent"], connections, idx
                 ),
             )
@@ -845,8 +876,32 @@ class NMUtil:
             s_macvlan.set_property(NM.SETTING_MACVLAN_TAP, connection["macvlan"]["tap"])
             s_macvlan.set_property(
                 NM.SETTING_MACVLAN_PARENT,
-                ArgUtil.connection_find_master(connection["parent"], connections, idx),
+                ArgUtil.connection_find_controller(
+                    connection["parent"], connections, idx
+                ),
             )
+        elif connection["type"] == "wireless":
+            s_con.set_property(
+                NM.SETTING_CONNECTION_TYPE, NM.SETTING_WIRELESS_SETTING_NAME
+            )
+            s_wireless = self.connection_ensure_setting(con, NM.SettingWireless)
+            s_wireless.set_property(
+                NM.SETTING_WIRELESS_SSID,
+                Util.GLib().Bytes.new(connection["wireless"]["ssid"].encode("utf-8")),
+            )
+
+            s_wireless_sec = self.connection_ensure_setting(
+                con, NM.SettingWirelessSecurity
+            )
+            s_wireless_sec.set_property(
+                NM.SETTING_WIRELESS_SECURITY_KEY_MGMT,
+                connection["wireless"]["key_mgmt"],
+            )
+
+            if connection["wireless"]["key_mgmt"] == "wpa-psk":
+                s_wireless_sec.set_property(
+                    NM.SETTING_WIRELESS_SECURITY_PSK, connection["wireless"]["password"]
+                )
         else:
             raise MyError("unsupported type %s" % (connection["type"]))
 
@@ -877,6 +932,15 @@ class NMUtil:
                 else:
                     s_ethtool.set_feature(nm_feature, NM.Ternary.FALSE)
 
+            for coalesce, setting in connection["ethtool"]["coalesce"].items():
+                nm_coalesce = nm_provider.get_nm_ethtool_coalesce(coalesce)
+
+                if nm_coalesce:
+                    if setting is None:
+                        s_ethtool.option_set(nm_coalesce, None)
+                    else:
+                        s_ethtool.option_set_uint32(nm_coalesce, int(setting))
+
         if connection["mtu"]:
             if connection["type"] == "infiniband":
                 s_infiniband = self.connection_ensure_setting(con, NM.SettingInfiniband)
@@ -885,14 +949,14 @@ class NMUtil:
                 s_wired = self.connection_ensure_setting(con, NM.SettingWired)
                 s_wired.set_property(NM.SETTING_WIRED_MTU, connection["mtu"])
 
-        if connection["master"] is not None:
+        if connection["controller"] is not None:
             s_con.set_property(
-                NM.SETTING_CONNECTION_SLAVE_TYPE, connection["slave_type"]
+                NM.SETTING_CONNECTION_SLAVE_TYPE, connection["port_type"]
             )
             s_con.set_property(
                 NM.SETTING_CONNECTION_MASTER,
-                ArgUtil.connection_find_master_uuid(
-                    connection["master"], connections, idx
+                ArgUtil.connection_find_controller_uuid(
+                    connection["controller"], connections, idx
                 ),
             )
         else:
@@ -935,13 +999,24 @@ class NMUtil:
                     s_ip4.add_dns(d["address"])
             for s in ip["dns_search"]:
                 s_ip4.add_dns_search(s)
+            s_ip4.clear_dns_options(True)
+            for s in ip["dns_options"]:
+                s_ip4.add_dns_option(s)
 
-            if ip["auto6"]:
+            if ip["ipv6_disabled"]:
+                s_ip6.set_property(NM.SETTING_IP_CONFIG_METHOD, "disabled")
+            elif ip["auto6"]:
                 s_ip6.set_property(NM.SETTING_IP_CONFIG_METHOD, "auto")
             elif addrs6:
                 s_ip6.set_property(NM.SETTING_IP_CONFIG_METHOD, "manual")
             else:
+                # we should not set "ipv6.method=ignore". "ignore" is a legacy mode
+                # and not really useful. Instead, we should set "link-local" here.
+                #
+                # But that fix is a change in behavior for the role, so it needs special
+                # care.
                 s_ip6.set_property(NM.SETTING_IP_CONFIG_METHOD, "ignore")
+
             for a in addrs6:
                 s_ip6.add_address(
                     NM.IPAddress.new(a["family"], a["address"], a["prefix"])
@@ -973,6 +1048,65 @@ class NMUtil:
                     s_ip4.add_route(rr)
                 else:
                     s_ip6.add_route(rr)
+
+        if connection["ieee802_1x"]:
+            s_8021x = self.connection_ensure_setting(con, NM.Setting8021x)
+
+            s_8021x.set_property(
+                NM.SETTING_802_1X_EAP, [connection["ieee802_1x"]["eap"]]
+            )
+            s_8021x.set_property(
+                NM.SETTING_802_1X_IDENTITY, connection["ieee802_1x"]["identity"]
+            )
+
+            s_8021x.set_property(
+                NM.SETTING_802_1X_PRIVATE_KEY,
+                Util.path_to_glib_bytes(connection["ieee802_1x"]["private_key"]),
+            )
+
+            if connection["ieee802_1x"]["private_key_password"]:
+                s_8021x.set_property(
+                    NM.SETTING_802_1X_PRIVATE_KEY_PASSWORD,
+                    connection["ieee802_1x"]["private_key_password"],
+                )
+
+            if connection["ieee802_1x"]["private_key_password_flags"]:
+                s_8021x.set_secret_flags(
+                    NM.SETTING_802_1X_PRIVATE_KEY_PASSWORD,
+                    Util.NM().SettingSecretFlags(
+                        Util.convert_passwd_flags_nm(
+                            connection["ieee802_1x"]["private_key_password_flags"]
+                        ),
+                    ),
+                )
+
+            s_8021x.set_property(
+                NM.SETTING_802_1X_CLIENT_CERT,
+                Util.path_to_glib_bytes(connection["ieee802_1x"]["client_cert"]),
+            )
+
+            if connection["ieee802_1x"]["ca_cert"]:
+                s_8021x.set_property(
+                    NM.SETTING_802_1X_CA_CERT,
+                    Util.path_to_glib_bytes(connection["ieee802_1x"]["ca_cert"]),
+                )
+
+            if connection["ieee802_1x"]["ca_path"]:
+                s_8021x.set_property(
+                    NM.SETTING_802_1X_CA_PATH,
+                    connection["ieee802_1x"]["ca_path"],
+                )
+
+            s_8021x.set_property(
+                NM.SETTING_802_1X_SYSTEM_CA_CERTS,
+                connection["ieee802_1x"]["system_ca_certs"],
+            )
+
+            if connection["ieee802_1x"]["domain_suffix_match"]:
+                s_8021x.set_property(
+                    NM.SETTING_802_1X_DOMAIN_SUFFIX_MATCH,
+                    connection["ieee802_1x"]["domain_suffix_match"],
+                )
 
         try:
             con.normalize()
@@ -1032,75 +1166,6 @@ class NMUtil:
             )
         return True
 
-    def connection_delete(self, connection, timeout=10):
-
-        # Do nothing, if the connection is already gone
-        if connection not in self.connection_list():
-            return
-
-        if "update2" in dir(connection):
-            return self.volatilize_connection(connection, timeout)
-
-        delete_cb = Util.create_callback("delete_finish")
-
-        cancellable = Util.create_cancellable()
-        cb_args = {}
-        connection.delete_async(cancellable, delete_cb, cb_args)
-        if not Util.GMainLoop_run(timeout):
-            cancellable.cancel()
-            raise MyError("failure to delete connection: %s" % ("timeout"))
-        if not cb_args.get("success", False):
-            raise MyError(
-                "failure to delete connection: %s"
-                % (cb_args.get("error", "unknown error"))
-            )
-
-        # workaround libnm oddity. The connection may not yet be gone if the
-        # connection was active and is deactivating. Wait.
-        c_uuid = connection.get_uuid()
-        gone = self.wait_till_connection_is_gone(c_uuid)
-        if not gone:
-            raise MyError(
-                "connection %s was supposedly deleted successfully, but it's still here"
-                % (c_uuid)
-            )
-
-    def volatilize_connection(self, connection, timeout=10):
-        update2_cb = Util.create_callback("update2_finish")
-
-        cancellable = Util.create_cancellable()
-        cb_args = {}
-
-        connection.update2(
-            None,  # settings
-            Util.NM().SettingsUpdate2Flags.IN_MEMORY_ONLY
-            | Util.NM().SettingsUpdate2Flags.VOLATILE,  # flags
-            None,  # args
-            cancellable,
-            update2_cb,
-            cb_args,
-        )
-
-        if not Util.GMainLoop_run(timeout):
-            cancellable.cancel()
-            raise MyError("failure to volatilize connection: %s" % ("timeout"))
-
-        Util.GMainLoop_iterate_all()
-
-        # Do not check of success if the connection does not exist anymore This
-        # can happen if the connection was already volatile and set to down
-        # during the module call
-        if connection not in self.connection_list():
-            return
-
-        # update2_finish returns None on failure and a GLib.Variant of type
-        # a{sv} with the result otherwise (which can be empty)
-        if cb_args.get("success", None) is None:
-            raise MyError(
-                "failure to volatilize connection: %s: %r"
-                % (cb_args.get("error", "unknown error"), cb_args)
-            )
-
     def create_checkpoint(self, timeout):
         """ Create a new checkpoint """
         checkpoint = Util.call_async_method(
@@ -1130,25 +1195,6 @@ class NMUtil:
             [path],
             mainloop_timeout=DEFAULT_ACTIVATION_TIMEOUT,
         )
-
-    def wait_till_connection_is_gone(self, uuid, timeout=10):
-        """
-        Wait until a connection is gone or until the timeout elapsed
-
-        :param uuid: UUID of the connection that to wait for to be gone
-        :param timeout: Timeout in seconds to wait for
-        :returns: True when connection is gone, False when timeout elapsed
-        :rtype: bool
-        """
-
-        def _poll_timeout_cb(unused):
-            if not self.connection_list(uuid=uuid):
-                Util.GMainLoop().quit()
-
-        poll_timeout_id = Util.GLib().timeout_add(100, _poll_timeout_cb, None)
-        gone = Util.GMainLoop_run(timeout)
-        Util.GLib().source_remove(poll_timeout_id)
-        return gone
 
     def connection_activate(self, connection, timeout=15, wait_time=None):
 
@@ -1226,13 +1272,13 @@ class NMUtil:
 
             if ac_state == NM.ActiveConnectionState.ACTIVATING:
                 if (
-                    self.device_is_master_type(dev)
+                    self.device_is_controller_type(dev)
                     and dev_state >= NM.DeviceState.IP_CONFIG
                     and dev_state <= NM.DeviceState.ACTIVATED
                 ):
-                    # master connections qualify as activated once they
+                    # controller connections qualify as activated once they
                     # reach IP-Config state. That is because they may
-                    # wait for slave devices to attach
+                    # wait for port devices to attach
                     return True, None
                 # fall through
             elif ac_state == NM.ActiveConnectionState.ACTIVATED:
@@ -1314,66 +1360,18 @@ class NMUtil:
         if failure_reason:
             raise MyError("connection not activated: %s" % (failure_reason))
 
-    def active_connection_deactivate(self, ac, timeout=10, wait_time=None):
-        def deactivate_cb(client, result, cb_args):
-            success = False
-            try:
-                success = client.deactivate_connection_finish(result)
-            except Exception as e:
-                if Util.error_is_cancelled(e):
-                    return
-                cb_args["error"] = str(e)
-            cb_args["success"] = success
-            Util.GMainLoop().quit()
-
-        cancellable = Util.create_cancellable()
-        cb_args = {}
-        self.nmclient.deactivate_connection_async(
-            ac, cancellable, deactivate_cb, cb_args
+    def reapply(self, device, connection=None):
+        version_id = 0
+        flags = 0
+        return Util.call_async_method(
+            device, "reapply", [connection, version_id, flags]
         )
-        if not Util.GMainLoop_run(timeout):
-            cancellable.cancel()
-            raise MyError("failure to deactivate connection: %s" % (timeout))
-        if not cb_args.get("success", False):
-            raise MyError(
-                "failure to deactivate connection: %s"
-                % (cb_args.get("error", "unknown error"))
-            )
-
-        self.active_connection_deactivate_wait(ac, wait_time)
-        return True
-
-    def active_connection_deactivate_wait(self, ac, wait_time):
-
-        if not wait_time:
-            return
-
-        NM = Util.NM()
-
-        def check_deactivated(ac):
-            return ac.get_state() >= NM.ActiveConnectionState.DEACTIVATED
-
-        if not check_deactivated(ac):
-
-            def check_deactivated_cb():
-                if check_deactivated(ac):
-                    Util.GMainLoop().quit()
-
-            ac_id = ac.connect(
-                "notify::state", lambda source, pspec: check_deactivated_cb()
-            )
-
-            try:
-                if not Util.GMainLoop_run(wait_time):
-                    raise MyError("connection not fully deactivated after timeout")
-            finally:
-                ac.handler_disconnect(ac_id)
 
 
 ###############################################################################
 
 
-class RunEnvironment:
+class RunEnvironment(object):
     def __init__(self):
         self._check_mode = None
 
@@ -1423,15 +1421,14 @@ class RunEnvironmentAnsible(RunEnvironment):
         "force_state_change": {"required": False, "default": False, "type": "bool"},
         "provider": {"required": True, "default": None, "type": "str"},
         "connections": {"required": False, "default": None, "type": "list"},
+        "__debug_flags": {"required": False, "default": "", "type": "str"},
     }
 
     def __init__(self):
         RunEnvironment.__init__(self)
         self._run_results = []
         self._log_idx = 0
-
-        from ansible.module_utils.basic import AnsibleModule
-
+        self.on_failure = None
         module = AnsibleModule(argument_spec=self.ARGS, supports_check_mode=True)
         self.module = module
 
@@ -1498,24 +1495,33 @@ class RunEnvironmentAnsible(RunEnvironment):
                 c["persistent_state"],
             )
             prefix = prefix + (", '%s'" % (c["name"]))
-        for r in rr["log"]:
-            yield (r[2], "[%03d] %s %s: %s" % (r[2], LogLevel.fmt(r[0]), prefix, r[1]))
+        for severity, msg, idx in rr["log"]:
+            yield (
+                idx,
+                "[%03d] %s %s: %s" % (idx, LogLevel.fmt(severity), prefix, msg),
+                severity,
+            )
 
-    def _complete_kwargs(self, connections, kwargs, traceback_msg=None):
-        if "warnings" in kwargs:
-            logs = list(kwargs["warnings"])
-        else:
-            logs = []
-
+    def _complete_kwargs(self, connections, kwargs, traceback_msg=None, fail=False):
+        warning_logs = kwargs.get("warnings", [])
+        debug_logs = []
         loglines = []
         for res in self._run_results:
             for idx, rr in enumerate(res):
                 loglines.extend(self._complete_kwargs_loglines(rr, connections, idx))
-        loglines.sort(key=lambda x: x[0])
-        logs.extend([x[1] for x in loglines])
+        loglines.sort(key=lambda log_line: log_line[0])
+        for idx, log_line, severity in loglines:
+            debug_logs.append(log_line)
+            if fail:
+                warning_logs.append(log_line)
+            elif severity >= LogLevel.WARN:
+                warning_logs.append(log_line)
         if traceback_msg is not None:
-            logs.append(traceback_msg)
-        kwargs["warnings"] = logs
+            warning_logs.append(traceback_msg)
+        kwargs["warnings"] = warning_logs
+        stderr = "\n".join(debug_logs) + "\n"
+        kwargs["stderr"] = stderr
+        kwargs["_invocation"] = {"module_args": self.module.params}
         return kwargs
 
     def exit_json(self, connections, changed=False, **kwargs):
@@ -1525,20 +1531,38 @@ class RunEnvironmentAnsible(RunEnvironment):
     def fail_json(
         self, connections, msg, changed=False, warn_traceback=False, **kwargs
     ):
+        if self.on_failure:
+            self.on_failure()
+
         traceback_msg = None
         if warn_traceback:
             traceback_msg = "exception: %s" % (traceback.format_exc())
         kwargs["msg"] = msg
         kwargs["changed"] = changed
         self.module.fail_json(
-            **self._complete_kwargs(connections, kwargs, traceback_msg)
+            **self._complete_kwargs(connections, kwargs, traceback_msg, fail=True)
         )
 
 
 ###############################################################################
 
 
-class Cmd:
+class NmLogHandler(logging.Handler):
+    def __init__(self, log_func, idx):
+        self._log = log_func
+        self._idx = idx
+        super(NmLogHandler, self).__init__()
+
+    def filter(self, record):
+        return True
+
+    def emit(self, record):
+        self._log(
+            self._idx, LogLevel.from_logging_level(record.levelno), record.getMessage()
+        )
+
+
+class Cmd(object):
     def __init__(
         self,
         run_env,
@@ -1547,6 +1571,7 @@ class Cmd:
         is_check_mode=False,
         ignore_errors=False,
         force_state_change=False,
+        debug_flags="",
     ):
         self.run_env = run_env
         self.validate_one_type = None
@@ -1560,6 +1585,7 @@ class Cmd:
         self._connections_data = None
         self._check_mode = CheckMode.PREPARE
         self._is_changed_modified_system = False
+        self._debug_flags = debug_flags
 
     def run_command(self, argv, encoding=None):
         return self.run_env.run_command(argv, encoding=encoding)
@@ -1740,23 +1766,27 @@ class Cmd:
             if self.check_mode == CheckMode.REAL_RUN:
                 self.start_transaction()
 
-            for idx, connection in enumerate(self.connections):
-                try:
-                    for action in connection["actions"]:
-                        if action == "absent":
-                            self.run_action_absent(idx)
-                        elif action == "present":
-                            self.run_action_present(idx)
-                        elif action == "up":
-                            self.run_action_up(idx)
-                        elif action == "down":
-                            self.run_action_down(idx)
-                        else:
-                            assert False
-                except Exception as error:
-                    if self.check_mode == CheckMode.REAL_RUN:
-                        self.rollback_transaction(idx, action, error)
-                    raise
+            # Reasoning for this order:
+            # For down/up profiles might need to be present, so do this first
+            # Put profile down before removing it if necessary
+            # To ensure up does not depend on anything that might be removed,
+            # do it last
+            for action in ("present", "down", "absent", "up"):
+                for idx, connection in enumerate(self.connections):
+                    try:
+                        if action in connection["actions"]:
+                            if action == "absent":
+                                self.run_action_absent(idx)
+                            elif action == "present":
+                                self.run_action_present(idx)
+                            elif action == "up":
+                                self.run_action_up(idx)
+                            elif action == "down":
+                                self.run_action_down(idx)
+                    except Exception as error:
+                        if self.check_mode == CheckMode.REAL_RUN:
+                            self.rollback_transaction(idx, action, error)
+                        raise
 
             if self.check_mode == CheckMode.REAL_RUN:
                 self.finish_transaction()
@@ -1816,7 +1846,7 @@ class Cmd:
         """ Hook for after all changes where made successfuly """
 
     def rollback_transaction(self, idx, action, error):
-        """ Hook if configuring a profile results in an error
+        """Hook if configuring a profile results in an error
 
         :param idx: Index of the connection that triggered the error
         :param action: Action that triggered the error
@@ -1830,6 +1860,10 @@ class Cmd:
         self.log_warn(
             idx, "failure: %s (%s) [[%s]]" % (error, action, traceback.format_exc())
         )
+
+    def on_failure(self):
+        """ Hook to do any cleanup on failure before exiting """
+        pass
 
     def run_action_absent(self, idx):
         raise NotImplementedError()
@@ -1853,6 +1887,12 @@ class Cmd_nm(Cmd):
         self._nmutil = None
         self.validate_one_type = ArgValidator_ListConnections.VALIDATE_ONE_MODE_NM
         self._checkpoint = None
+        # pylint: disable=import-error, no-name-in-module
+        from ansible.module_utils.network_lsr.nm import provider  # noqa:E501
+
+        # pylint: enable=import-error, no-name-in-module
+
+        self._nm_provider = provider.NetworkManagerProvider()
 
     @property
     def nmutil(self):
@@ -1892,17 +1932,16 @@ class Cmd_nm(Cmd):
 
     def start_transaction(self):
         Cmd.start_transaction(self)
-        self._checkpoint = self.nmutil.create_checkpoint(
-            len(self.connections) * DEFAULT_ACTIVATION_TIMEOUT
-        )
+        if "disable-checkpoints" in self._debug_flags:
+            pass
+        else:
+            self._checkpoint = self.nmutil.create_checkpoint(
+                len(self.connections) * DEFAULT_ACTIVATION_TIMEOUT
+            )
 
     def rollback_transaction(self, idx, action, error):
         Cmd.rollback_transaction(self, idx, action, error)
-        if self._checkpoint:
-            try:
-                self.nmutil.rollback_checkpoint(self._checkpoint)
-            finally:
-                self._checkpoint = None
+        self.on_failure()
 
     def finish_transaction(self):
         Cmd.finish_transaction(self)
@@ -1912,12 +1951,19 @@ class Cmd_nm(Cmd):
             finally:
                 self._checkpoint = None
 
-    def _check_ethtool_setting_support(self, idx, connection):
-        """ Check if SettingEthtool support is needed and available
+    def on_failure(self):
+        if self._checkpoint:
+            try:
+                self.nmutil.rollback_checkpoint(self._checkpoint)
+            finally:
+                self._checkpoint = None
 
-        If any feature is specified, the SettingEthtool setting needs to be
-        available. Also NM needs to know about each specified setting. Do not
-        check if NM knows about any defaults.
+    def _check_ethtool_setting_support(self, idx, connection):
+        """Check if SettingEthtool support is needed and available
+
+        If any ethtool setting is specified, the SettingEthtool
+        setting needs to be available. Also NM needs to know about each
+        specified setting. Do not check if NM knows about any defaults
 
         """
         NM = Util.NM()
@@ -1928,45 +1974,65 @@ class Cmd_nm(Cmd):
         if "ethtool" not in connection:
             return
 
-        ethtool_features = connection["ethtool"]["features"]
-        specified_features = dict(
-            [(k, v) for k, v in ethtool_features.items() if v is not None]
-        )
+        ethtool_dict = {
+            "features": nm_provider.get_nm_ethtool_feature,
+            "coalesce": nm_provider.get_nm_ethtool_coalesce,
+        }
 
-        if specified_features and not hasattr(NM, "SettingEthtool"):
-            self.log_fatal(idx, "ethtool.features specified but not supported by NM")
+        for ethtool_key, nm_get_name_fcnt in ethtool_dict.items():
+            ethtool_settings = connection["ethtool"][ethtool_key]
+            specified = dict(
+                [(k, v) for k, v in ethtool_settings.items() if v is not None]
+            )
 
-        for feature, setting in specified_features.items():
-            nm_feature = nm_provider.get_nm_ethtool_feature(feature)
-            if not nm_feature:
+            if specified and not hasattr(NM, "SettingEthtool"):
                 self.log_fatal(
-                    idx, "ethtool feature %s specified but not support by NM" % feature
+                    idx, "ethtool.%s specified but not supported by NM", specified
                 )
 
+            for option, _ in specified.items():
+                nm_name = nm_get_name_fcnt(option)
+                if not nm_name:
+                    self.log_fatal(
+                        idx,
+                        "ethtool %s setting %s specified "
+                        "but not supported by NM" % (ethtool_key, option),
+                    )
+
     def run_action_absent(self, idx):
-        seen = set()
         name = self.connections[idx]["name"]
-        black_list_names = None
-        if not name:
-            name = None
+        profile_uuids = set()
+
+        if name:
+            black_list_names = []
+        else:
+            # Delete all profiles except explicitly included
             black_list_names = ArgUtil.connection_get_non_absent_names(self.connections)
-        while True:
-            connections = self.nmutil.connection_list(
-                name=name, black_list_names=black_list_names, black_list=seen
+
+        for nm_profile in self._nm_provider.get_connections():
+            if name and nm_profile.get_id() != name:
+                continue
+            if nm_profile.get_id() not in black_list_names:
+                profile_uuids.add(nm_profile.get_uuid())
+
+        if not profile_uuids:
+            self.log_info(idx, "no connection matches '%s' to delete" % (name))
+            return
+
+        logger = logging.getLogger()
+        log_handler = NmLogHandler(self.log, idx)
+        logger.addHandler(log_handler)
+        timeout = self.connections[idx].get("wait")
+        changed = False
+        for profile_uuid in profile_uuids:
+            changed |= self._nm_provider.volatilize_connection_by_uuid(
+                profile_uuid,
+                DEFAULT_TIMEOUT if timeout is None else timeout,
+                self.check_mode != CheckMode.REAL_RUN,
             )
-            if not connections:
-                break
-            c = connections[-1]
-            seen.add(c)
-            self.log_info(idx, "delete connection %s, %s" % (c.get_id(), c.get_uuid()))
+        if changed:
             self.connections_data_set_changed(idx)
-            if self.check_mode == CheckMode.REAL_RUN:
-                try:
-                    self.nmutil.connection_delete(c)
-                except MyError as e:
-                    self.log_error(idx, "delete connection failed: %s" % (e))
-        if not seen:
-            self.log_info(idx, "no connection '%s'" % (name))
+        logger.removeHandler(log_handler)
 
     def run_action_present(self, idx):
         connection = self.connections[idx]
@@ -2014,29 +2080,50 @@ class Cmd_nm(Cmd):
                 % (con_cur.get_id(), con_cur.get_uuid()),
             )
 
-        seen = set()
+        if (
+            self.check_mode == CheckMode.REAL_RUN
+            and connection["ieee802_1x"] is not None
+            and connection["ieee802_1x"].get("ca_path")
+        ):
+            # It seems that NM on Fedora 31
+            # (NetworkManager-1.20.4-1.fc31.x86_64) does need some time so that
+            # the D-Bus information is actually up-to-date.
+            time.sleep(0.1)
+            Util.GMainLoop_iterate_all()
+            updated_connection = Util.first(
+                self.nmutil.connection_list(
+                    name=connection["name"], uuid=connection["nm.uuid"]
+                )
+            )
+            ca_path = updated_connection.get_setting_802_1x().props.ca_path
+            if not ca_path:
+                self.log_fatal(
+                    idx,
+                    "ieee802_1x.ca_path specified but not supported by "
+                    "NetworkManager. Please update NetworkManager or use "
+                    "ieee802_1x.ca_cert.",
+                )
         if con_cur is not None:
-            seen.add(con_cur)
+            self._remove_duplicate_profile(idx, con_cur, connection.get("timeout"))
 
-        while True:
-            connections = self.nmutil.connection_list(
-                name=connection["name"],
-                black_list=seen,
-                black_list_uuids=[connection["nm.uuid"]],
-            )
-            if not connections:
-                break
-            c = connections[-1]
-            self.log_info(
-                idx, "delete duplicate connection %s, %s" % (c.get_id(), c.get_uuid())
-            )
-            self.connections_data_set_changed(idx)
-            if self.check_mode == CheckMode.REAL_RUN:
-                try:
-                    self.nmutil.connection_delete(c)
-                except MyError as e:
-                    self.log_error(idx, "delete duplicate connection failed: %s" % (e))
-            seen.add(c)
+    def _remove_duplicate_profile(self, idx, cur_nm_profile, timeout):
+        logger = logging.getLogger()
+        log_handler = NmLogHandler(self.log, idx)
+        logger.addHandler(log_handler)
+
+        for nm_profile in self._nm_provider.get_connections():
+            if (
+                nm_profile.get_id() == cur_nm_profile.get_id()
+                and nm_profile.get_uuid() != cur_nm_profile.get_uuid()
+            ):
+                if self.check_mode == CheckMode.REAL_RUN:
+                    self._nm_provider.volatilize_connection_by_uuid(
+                        uuid=nm_profile.get_uuid(),
+                        timeout=(DEFAULT_TIMEOUT if timeout is None else timeout),
+                        check_mode=True,
+                    )
+                self.connections_data_set_changed(idx)
+        logger.removeHandler(log_handler)
 
     def run_action_up(self, idx):
         connection = self.connections[idx]
@@ -2088,6 +2175,9 @@ class Cmd_nm(Cmd):
         )
         self.connections_data_set_changed(idx)
         if self.check_mode == CheckMode.REAL_RUN:
+            if self._try_reapply(idx, con):
+                return
+
             try:
                 ac = self.nmutil.connection_activate(con)
             except MyError as e:
@@ -2102,51 +2192,46 @@ class Cmd_nm(Cmd):
             except MyError as e:
                 self.log_error(idx, "up connection failed while waiting: %s" % (e))
 
+    def _try_reapply(self, idx, con):
+        """Try to reapply a connection
+
+        If there is exactly one active connection with the same UUID activated
+        on exactly one device, ask the device to reapply the connection.
+
+        :returns: `True`, when the connection was reapplied, `False` otherwise
+        :rtype: bool
+        """
+        NM = Util.NM()
+
+        acons = list(self.nmutil.active_connection_list(connections=[con]))
+        if len(acons) != 1:
+            return False
+
+        active_connection = acons[0]
+        if active_connection.get_state() == NM.ActiveConnectionState.ACTIVATED:
+            devices = active_connection.get_devices()
+            if len(devices) == 1:
+                try:
+                    self.nmutil.reapply(devices[0])
+                    self.log_info(idx, "connection reapplied")
+                    return True
+                except MyError as error:
+                    self.log_info(idx, "connection reapply failed: %s" % (error))
+        return False
+
     def run_action_down(self, idx):
         connection = self.connections[idx]
-
-        cons = self.nmutil.connection_list(name=connection["name"])
-        changed = False
-        if cons:
-            seen = set()
-            while True:
-                ac = Util.first(
-                    self.nmutil.active_connection_list(
-                        connections=cons, black_list=seen
-                    )
-                )
-                if ac is None:
-                    break
-                seen.add(ac)
-                self.log_info(
-                    idx, "down connection %s: %s" % (connection["name"], ac.get_path())
-                )
-                changed = True
-                self.connections_data_set_changed(idx)
-                if self.check_mode == CheckMode.REAL_RUN:
-                    try:
-                        self.nmutil.active_connection_deactivate(ac)
-                    except MyError as e:
-                        self.log_error(idx, "down connection failed: %s" % (e))
-
-                    wait_time = connection["wait"]
-                    if wait_time is None:
-                        wait_time = 10
-
-                    try:
-                        self.nmutil.active_connection_deactivate_wait(ac, wait_time)
-                    except MyError as e:
-                        self.log_error(
-                            idx, "down connection failed while waiting: %s" % (e)
-                        )
-
-                cons = self.nmutil.connection_list(name=connection["name"])
-        if not changed:
-            self.log_error(
-                idx,
-                "down connection %s failed: connection not found"
-                % (connection["name"]),
-            )
+        logger = logging.getLogger()
+        log_handler = NmLogHandler(self.log, idx)
+        logger.addHandler(log_handler)
+        timeout = connection["wait"]
+        if self._nm_provider.deactivate_connection(
+            connection["name"],
+            10 if timeout is None else timeout,
+            self.check_mode != CheckMode.REAL_RUN,
+        ):
+            self.connections_data_set_changed(idx)
+        logger.removeHandler(log_handler)
 
 
 ###############################################################################
@@ -2179,6 +2264,36 @@ class Cmd_initscripts(Cmd):
             return None
         return f
 
+    def forget_nm_connection(self, path):
+        """
+        Forget a NetworkManager connection by loading the path of the deleted
+        profile. This inverts the effect of loading a profile with
+        `NM_CONTROLLED=no` earlier, which made NetworkManager ignore the
+        device.
+
+        This does not use the Python libnm bindings because they might not be
+        present on the system, since the module is currently operating for the
+        initscripts provider. If it fails, assume that NetworkManager is not
+        present and did not save any state about the corresponding interface.
+        """
+        try:
+            subprocess.call(
+                [
+                    "busctl",
+                    "--system",
+                    "call",
+                    "org.freedesktop.NetworkManager",
+                    "/org/freedesktop/NetworkManager/Settings",
+                    "org.freedesktop.NetworkManager.Settings",
+                    "LoadConnections",
+                    "as",
+                    "1",
+                    path,
+                ]
+            )
+        except Exception:
+            pass
+
     def run_action_absent(self, idx):
         n = self.connections[idx]["name"]
         name = n
@@ -2210,6 +2325,7 @@ class Cmd_initscripts(Cmd):
                 if self.check_mode == CheckMode.REAL_RUN:
                     try:
                         os.unlink(path)
+                        self.forget_nm_connection(path)
                     except Exception as e:
                         self.log_error(
                             idx, "delete ifcfg-rh file '%s' failed: %s" % (path, e)
@@ -2279,11 +2395,18 @@ class Cmd_initscripts(Cmd):
 
         path = IfcfgUtil.ifcfg_path(name)
         if not os.path.isfile(path):
-            if self.check_mode == CheckMode.REAL_RUN:
+            if (
+                self.check_mode == CheckMode.REAL_RUN
+                and connection.get(PERSISTENT_STATE) != ABSENT_STATE
+            ):
                 self.log_error(idx, "ifcfg file '%s' does not exist" % (path))
             else:
+                if self.check_mode != CheckMode.REAL_RUN:
+                    in_checkmode = " in check mode"
+                else:
+                    in_checkmode = ""
                 self.log_info(
-                    idx, "ifcfg file '%s' does not exist in check mode" % (path)
+                    idx, "ifcfg file '%s' does not exist%s" % (path, in_checkmode)
                 )
             return
 
@@ -2361,8 +2484,10 @@ def main():
             is_check_mode=run_env_ansible.module.check_mode,
             ignore_errors=params["ignore_errors"],
             force_state_change=params["force_state_change"],
+            debug_flags=params["__debug_flags"],
         )
         connections = cmd.connections
+        run_env_ansible.on_failure = cmd.on_failure
         cmd.run()
     except Exception as e:
         run_env_ansible.fail_json(
