@@ -1,0 +1,15 @@
+---
+
+role_action: provision
+
+ovirt:
+  url: ''
+  username: ''
+  password: ''
+
+ansible_port: 22
+instance_wait_retry_limit: 600
+instance_wait_connection_timeout: 300
+
+wait_for_static_ip_assigned: yes
+

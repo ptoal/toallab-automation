@@ -55,7 +55,7 @@ template:
 
 qemu_cmdline_second_iso:
   - -device
-  - ide-cd,bus=ide.3,unit=0,drive=drive-ua-0001,id=ua-0001,bootindex=3
+  - ide-cd,bus={{ qemu_second_cdrom_device_bus_type }}.{{ qemu_second_cdrom_device_bus_id }},unit={{ qemu_second_cdrom_device_bus_unit }},drive=drive-ua-0001,id=ua-0001,bootindex=3
   - -drive
   - format=raw,if=none,id=drive-ua-0001,werror=report,rerror=report,readonly=on,file=/rhev/data-center/{{ ovirt_datacenter_id }}/{{ ovirt_datastore_id }}/images/{{ ks_iso_file_disk_id }}/{{ ks_iso_file_image_id }}
 

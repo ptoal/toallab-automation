@@ -73,12 +73,26 @@
         src: "{{ key_files_prefix}}-rootchain.pem"
         dest: /etc/pki/ca-trust/source/anchors/
       register: rootchain_result
-      notify: restart httpd
+      notify: 
+        - update ca-trust 
+        - restart httpd
 
     - name: Certificate store updated
       command: /usr/bin/update-ca-trust
       when: rootchain_result.changed
       notify: restart httpd
+
+    - name: Apache CA is file, not link
+      file:
+        path: /etc/pki/ovirt-engine/apache-ca.pem
+        state: file
+      register: apache_ca_stat
+
+    - name: Apache CA link is removed
+      file:
+        path: /etc/pki/ovirt-engine/apache-ca.pem
+        state: absent
+      when: apache_ca_stat.state == "file"
 
     - name: CA Rootchain in Apache config
       copy:
@@ -92,6 +106,9 @@
         src: "{{ key_files_prefix }}.key"
         dest: /etc/pki/ovirt-engine/keys/apache.key.nopass
         backup: yes
+        owner: root
+        group: ovirt
+        mode: 640
       notify: restart httpd
 
     - name: Certificate installed
@@ -99,6 +116,9 @@
         src: "{{ key_files_prefix }}.pem"
         dest: /etc/pki/ovirt-engine/certs/apache.cer
         backup: yes
+        owner: root
+        group: ovirt
+        mode: 644
       notify: restart httpd
 
     - name: Trust Store Configuration
@@ -121,14 +141,16 @@
         - SSL_CERTIFICATE=/etc/pki/ovirt-engine/apache.cer
         - SSL_KEY=/etc/pki/ovirt-engine/keys/apache.key.nopass
       notify:
-        - restart ovn
-        - restart ovirt-engine
+        - restart ovirt-websocket-proxy
 
   handlers:
     - name: restart httpd
       service:
         name: httpd
         state: restarted
+
+    - name: update ca-trust
+      command: update-ca-trust
 
     - name: restart ovn
       service:
@@ -138,6 +160,11 @@
     - name: restart ovirt-engine
       service:
         name: ovirt-engine
+        state: restarted
+
+    - name: restart ovirt-websocket-proxy
+      service:
+        name: ovirt-websocket-proxy
         state: restarted
 
 

@@ -1,0 +1,25 @@
+---
+
+- block:
+    - name: obtain SSO token with using username/password credentials
+      ovirt_auth:
+        url: "{{ lookup('env', 'OVIRT_URL')|default(ovirt.url, true) }}"
+        username: "{{ lookup('env', 'OVIRT_USERNAME')|default(ovirt.username, true) }}"
+        password: "{{ lookup('env', 'OVIRT_PASSWORD')|default(ovirt.password, true) }}"
+        insecure: yes
+
+    - include_tasks: provision.yml
+      when: role_action == 'provision'
+
+    - include_tasks: deprovision.yml
+      run_once: yes
+      when: role_action == 'deprovision'
+  always:
+    - name: revoke the SSO token
+      ovirt_auth:
+        url: "{{ lookup('env', 'OVIRT_URL')|default(ovirt.url, true) }}"
+        username: "{{ lookup('env', 'OVIRT_USERNAME')|default(ovirt.username, true) }}"
+        password: "{{ lookup('env', 'OVIRT_PASSWORD')|default(ovirt.password, true) }}"
+        insecure: yes
+        ovirt_auth: "{{ ovirt_auth }}"
+        state: absent

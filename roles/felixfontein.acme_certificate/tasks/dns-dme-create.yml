@@ -1,0 +1,32 @@
+---
+# Create DNS challenges for DNS provider Amazon Route53
+- name: Creating challenge DNS entries for domains {{ ', '.join(domains) }} via DNSMadeEasy
+  connection: local
+  community.general.dnsmadeeasy:
+    account_key: "{{ dme_account_key }}"
+    account_secret: "{{ dme_account_secret }}"
+    # This is fragile, and will only work for 2-level domain (eg: corp.com, NOT corp.co.uk )
+    domain: "{{ item.key | regex_replace('^(?:.*\\.|)([^.]+\\.[^.]+)$', '\\1') }}"
+    record_ttl: 60
+    record_type: TXT
+    record_name: "{{ item.key |regex_replace('^(.*)(\\.[^.]+\\.[^.]+)$', '\\1') }}" 
+    record_value: "{{ item.value|first }}"
+    state: present
+  # Need dnsmadeeasy module fixed (https://github.com/ansible/ansible/issues/58305)
+  run_once: True
+  with_dict: "{{ acme_certificate_INTERNAL_challenge.challenge_data_dns }}"
+  tags:
+  - issue-tls-certs-newkey
+  - issue-tls-certs
+
+- name: Wait for DNS entries to become available
+  shell: "dig txt {{ item.key }} +short @8.8.8.8"
+  register: dig_result
+  until: "item.value|first in dig_result.stdout"
+  retries: 60
+  delay: 5
+  with_dict: "{{ acme_certificate_INTERNAL_challenge.challenge_data_dns }}"
+
+- name: Pause for 60s for more propagation
+  pause:
+    minutes: 1  

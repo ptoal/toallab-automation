@@ -1,0 +1,18 @@
+---
+
+- name: wait until the image is unlocked by the oVirt engine
+  ovirt_disk_info:
+    auth: "{{ ovirt_auth }}"
+    pattern: "name={% if item.1.name_prefix | default(true) %}{{ item.0.name }}_{% endif %}{{ item.1.name }}"
+  register: ovirt_disk_info
+  until: (ovirt_disk_info.ovirt_disks is defined) and (ovirt_disk_info.ovirt_disks | length > 0) and (ovirt_disk_info.ovirt_disks[0].status != "locked")
+  retries: 10
+  delay: 3
+  with_subelements:
+    - "{{ nodes }}"
+    - disks
+    - skip_missing: yes
+  when:
+    - nodes is defined
+    - disks_creation.results is defined
+    - item.1 is defined

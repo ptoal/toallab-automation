@@ -18,6 +18,10 @@ vm_failed: no
 custom_efi_enabled: no
 custom_efi_path: /usr/share/edk2.git/ovmf-x64/OVMF_CODE-pure-efi.fd
 
+qemu_second_cdrom_device_bus_type: ide
+qemu_second_cdrom_device_bus_id: 3
+qemu_second_cdrom_device_bus_unit: 0
+
 virtio_iso_url: https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/archive-virtio/virtio-win-0.1.173-2/virtio-win.iso
 winrm_enable_script_url: https://raw.githubusercontent.com/ansible/ansible/devel/examples/scripts/ConfigureRemotingForAnsible.ps1
 
