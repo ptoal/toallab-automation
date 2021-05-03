@@ -10,6 +10,9 @@ collections:
     source: https://galaxy.ansible.com
     #    source: https://hub.mgmt.toal.ca/api/galaxy/content/published/
 
+  - name: ovirt.ovirt
+    source: https://galaxy.ansible.com
+
   - name: redhat.rhv
     source: https://cloud.redhat.com/api/automation-hub/
 
