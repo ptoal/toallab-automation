@@ -1,12 +1,14 @@
 ---
 - name: VM Provisioning
-  hosts: tag_ansible:&tag_tower:&cluster_ToalLabRHV
+  hosts: tag_ansible:&tag_tower
   connection: local
+  collections:
+   - redhat.rhv
 
   tasks:
     - block:
       - name: Obtain SSO token from username / password credentials
-        redhat.rhv.ovirt_auth:
+        ovirt_auth:
           url: "{{ ovirt_url }}"
           username: "{{ ovirt_username }}"
           password: "{{ ovirt_password }}"
@@ -24,7 +26,8 @@
             state: present
 
       - name: VM Created
-
+        ovirt_vm:
+        
 
 
       - name: Add NIC to VM

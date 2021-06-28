@@ -16,6 +16,8 @@
 - name: oatakan.windows_update
 - name: oatakan.ansible-role-ovirt
   src: git+https://github.com/oatakan/ansible-role-ovirt.git
+- name: oatakan.rhel_template_build
+- name: oatakan.rhel_ovirt_template
 - name: ikke_t.podman_container_systemd
 - name: ikke_t.container_image_cleanup
 

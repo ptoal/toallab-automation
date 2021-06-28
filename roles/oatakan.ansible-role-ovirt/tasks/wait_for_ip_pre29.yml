@@ -59,7 +59,7 @@
     - nics.ansible_facts.ovirt_nics[0].reported_devices[0].ips[0].address is defined
     - nics.ansible_facts.ovirt_nics[0].reported_devices[0].ips[0].version == 'v4'
     - nics.ansible_facts.ovirt_nics[0].reported_devices[0].ips[0].address == item.networks[0].ip
-  retries: 300
+  retries: "{{ ip_wait_retry_limit }}"
   delay: 10
   with_items: "{{ nodes }}"
   when:

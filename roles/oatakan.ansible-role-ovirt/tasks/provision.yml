@@ -47,7 +47,7 @@
   until: deployed_instances.finished
   retries: "{{ instance_wait_retry_limit }}"
   delay: 10
-  no_log: false
+  no_log: true
   with_items: "{{ deploy.results }}"
   when:
     - nodes is defined
@@ -108,6 +108,7 @@
       nic_netmask: "{{ item.networks[0].netmask | default('') }}"
       nic_gateway: "{{ item.networks[0].gateway | default('') }}"
       nic_name: "{{ item.networks[0].nic_name | default(item.networks[0].device_name) | default('eth0') }}"
+      nic_on_boot: true
       host_name: "{{ item.name }}.{{ item.domain | default('') }}"
       dns_servers: "{{ item.dns_servers|join(' ') | default([]) }}"
       custom_script: "{{ item.custom_script | default('') }}"
@@ -163,7 +164,6 @@
 
 - name: assign tags to provisioned vms
   ovirt_tag:
-    auth: "{{ ovirt_auth }}"
     name: "{{ item.1 }}_{{ item.0.item.item[item.1] }}"
     vms: ["{{ item.0.item.item.name }}"]
     state: attached

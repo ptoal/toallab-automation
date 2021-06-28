@@ -1,0 +1,61 @@
+---
+
+temp_directory: tmp{{ awx_job_id | default('') }}
+
+iso_file: "linux_{{ linux_distro_name }}_ks{{ awx_job_id | default('') }}.iso"
+
+export_dir: "{{ playbook_dir }}/{{ temp_directory }}"
+
+providers:
+  ovirt:
+    datacenter: "{{ ovirt_datacenter }}"
+    cluster: "{{ ovirt_cluster }}"
+    data_domain: "{{ ovirt_data_domain }}"
+    export_domain: "{{ ovirt_export_domain }}"
+    iso_domain: "{{ ovirt_iso_domain }}"
+
+template:
+  name: "{{ template_vm_name }}"
+  role: linux_template
+  app_name: linux_template_generate
+  domain: "{{ template_vm_domain }}"
+  disks:
+    - name: "{{ template_vm_name }}"
+      size: "{{ template_vm_root_disk_size }}GiB"
+      format: "{{ template_vm_root_disk_format }}"
+      interface: "{{ template_vm_root_disk_interface | default('virtio') }}"
+      bootable: yes
+      storage_domain: "{{ providers.ovirt.data_domain | default('data_domain') }}"
+  memory: "{{ template_vm_memory }}"
+  cpu: "{{ template_vm_cpu }}"
+  bios_type: "{{ ('q35_ovmf') if (template_vm_efi|bool and not custom_efi_enabled|bool) else (omit) }}"
+  networks:
+    - name: "{{ template_vm_network_name }}"
+      ip: "{{ template_vm_ip_address }}"
+      netmask: "{{ template_vm_netmask }}"
+      gateway: "{{ template_vm_gateway }}"
+      domain: "{{ template_vm_domain }}"
+      device_type: e1000
+      dns_servers: "{{ template_vm_dns_servers }}"
+  cd_iso: "{{ iso_file_id | default(iso_file_name) }}"  # if using data domain, file name does not work, need to use id
+
+linux_ks_folder: "{{ os_short_names[(linux_distro_name|default('rhel_80'))].ks_folder | default('rhel8') }}"
+template_vm_guest_id: "{{ os_short_names[(linux_distro_name|default('rhel_80'))].guest_id | default('rhel_8x64') }}"
+
+qemu_cmdline_second_iso:
+  - -device
+  - ide-cd,bus={{ qemu_second_cdrom_device_bus_type }}.{{ qemu_second_cdrom_device_bus_id }},unit={{ qemu_second_cdrom_device_bus_unit }},drive=drive-ua-0001,id=ua-0001,bootindex=3
+  - -drive
+  - format=raw,if=none,id=drive-ua-0001,werror=report,rerror=report,readonly=on,file=/rhev/data-center/{{ ovirt_datacenter_id }}/{{ ovirt_datastore_id }}/images/{{ ks_iso_file_disk_id }}/{{ ks_iso_file_image_id }}
+
+qemu_cmdline_efi:
+  - -drive
+  - if=pflash,format=raw,readonly,file={{ custom_efi_path }}
+
+custom_properties:
+  - name: qemu_cmdline
+    value: "{{ ((qemu_cmdline_second_iso + qemu_cmdline_efi) | to_json) if (template_vm_efi|bool and custom_efi_enabled|bool) else (qemu_cmdline_second_iso | to_json) }}"
+
+custom_properties_efi:
+  - name: qemu_cmdline
+    value: "{{ (qemu_cmdline_efi | to_json) if (template_vm_efi|bool and custom_efi_enabled|bool) else ('[]') }}"

@@ -9,22 +9,22 @@
         architecture: x86_64
         build: true
         comment: "RHEL 8 Template"
-        compute_profile: "3-Large"
-        compute_resource: "Home Lab"
-        compute_attributes:
-          cpus: 4
-          memory_mb: 4096
-        content_view: "RHEL8"
+        compute_profile: "4c8g"
+        compute_attributes:  
+          start: "1"
+        compute_resource: "ToalLab"
+        content_view: "composite-rhel8"
         domain: "sandbox.toal.ca"
         enabled: true
-        hostgroup: "Lab RHEL Hosts/RHEL 8"
-        kickstart_repository:
+        hostgroup: "RHEL8"
         lifecycle_environment: "Library"
         location: "Lab"
         name: "rhel8build.sandbox.toal.ca"
-        operatingsystem: "Red Hat 8.3"
+        operatingsystem: "RedHat 8.3"
         organization: "Toal.ca"
         password: "{{ vault_sat6_pass }}"
-        server_url: "https://sat6.lab.toal.ca/"
-        subnet: "192.168.16.0"
-        username: "{{ vault_sat6_user }}"
+        server_url: "https://satellite1.mgmt.toal.ca/"
+        subnet: "sandbox"
+        username: "{{ satellite_admin_user }}"
+        password: "{{ satellite_admin_pass }}"
+        validate_certs: no

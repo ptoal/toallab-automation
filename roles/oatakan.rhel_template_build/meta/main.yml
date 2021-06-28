@@ -1,0 +1,23 @@
+---
+dependencies: []
+
+galaxy_info:
+  author: oatakan
+  description: RedHat/CentOS template build.
+  role_name: rhel_template_build
+  company: "Red Hat"
+  license: "license (BSD, MIT)"
+  min_ansible_version: 2.4
+  platforms:
+    - name: EL
+      versions:
+      - 6
+      - 7
+      - 8
+  galaxy_tags:
+    - cloud
+    - system
+    - packaging
+    - development
+    - packer
+    - vmware

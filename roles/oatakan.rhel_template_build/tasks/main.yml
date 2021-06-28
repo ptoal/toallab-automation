@@ -1,0 +1,216 @@
+---
+
+- name: Get the current kernel release.
+  command: uname -r
+  changed_when: false
+  register: kernel_release
+
+- name: Ensure necessary packages are installed.
+  yum:
+    name:
+      - wget
+      - perl
+      - cpp
+      - gcc
+      - make
+      - bzip2
+      - kernel-headers
+      - kernel-devel
+      - "kernel-devel-{{ kernel_release.stdout }}"
+      - cifs-utils
+    state: present
+
+- name: Ensure libselinux-python package is installed.
+  yum:
+    name:
+      - libselinux-python
+    state: present
+  when: ansible_distribution_major_version|int < 8
+
+- name: Ensure python3-libselinux package is installed.
+  yum:
+    name:
+      - python3-libselinux
+    state: present
+  when: ansible_distribution_major_version|int == 8
+
+# Fix slow DNS.
+- name: Fix slow DNS (adapted from Bento).
+  lineinfile:
+    dest: /etc/sysconfig/network
+    regexp: '^RES_OPTIONS'
+    line: 'RES_OPTIONS="single-request-reopen"'
+    state: present
+
+# see https://fedoraproject.org/wiki/Changes/NetworkManager_keyfile_instead_of_ifcfg_rh
+- name: ensure older style network config files for greater compatibility
+  copy:
+    dest: /etc/NetworkManager/conf.d/99-main-plugins.conf
+    content: |
+      [main]
+      plugins=ifcfg-rh
+  when: ansible_distribution_major_version|int == 8
+
+- name: Restart network service (explicitly).
+  service:
+    name: network
+    state: restarted
+  when: ansible_distribution_major_version|int < 8
+
+- name: Restart NetworkManager service (explicitly).
+  service:
+    name: NetworkManager
+    state: restarted
+  when: ansible_distribution_major_version|int == 8
+
+- name: Ensure we can still connect
+  wait_for_connection:
+
+# SSH daemon configuration.
+- name: Configure SSH daemon.
+  lineinfile:
+    dest: /etc/ssh/sshd_config
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+    state: present
+  loop:
+    - { regexp: '^UseDNS', line: 'UseDNS no' }
+    - { regexp: '^GSSAPIAuthentication', line: 'GSSAPIAuthentication no' }
+
+# Local user SSH configuration.
+- name: Configure local user .ssh directory.
+  file:
+    path: /home/{{ local_account_username }}/.ssh
+    state: directory
+    owner: "{{ local_account_username }}"
+    group: "{{ local_account_username }}"
+    mode: 0700
+
+- name: Get Vagrant's public key.
+  get_url:
+    url: https://github.com/mitchellh/vagrant/raw/master/keys/vagrant.pub
+    dest: /home/{{ local_account_username }}/.ssh/authorized_keys
+    owner: "{{ local_account_username }}"
+    group: "{{ local_account_username }}"
+    mode: 0600
+  ignore_errors: yes
+  when: target_vagrant | bool
+
+- name: autolabel on boot
+  command: fixfiles onboot
+  changed_when: False
+
+- include_tasks: cloud-init.yml
+  when: target_ovirt | bool
+
+- include_tasks: ovirt.yml
+  when: target_ovirt | bool
+
+# VirtualBox tools installation.
+- name: Check if VirtualBox is running the guest VM.
+  stat:
+    path: /home/{{ local_account_username }}/.vbox_version
+  register: virtualbox_check
+
+- include_tasks: virtualbox.yml
+  when: virtualbox_check.stat.exists
+
+# VMware tools installation.
+- name: Check if VMWare is running the guest VM.
+  shell: |
+    set -o pipefail
+    cat /proc/scsi/scsi | grep VMware
+  changed_when: false
+  failed_when: false
+  register: vmware_check
+
+- include_tasks: vmware.yml
+  when: vmware_check.rc == 0
+
+# Cleanup tasks.
+- name: Remove unneeded packages.
+  yum:
+    name:
+      - cpp
+      - kernel-devel
+      - kernel-headers
+    disablerepo: '*'
+    state: absent
+
+- name: Clean up yum.
+  command: yum clean all
+  args:
+    warn: no
+  changed_when: false
+
+- name: Flag the system for re-configuration
+  file:
+    path: /.unconfigured
+    state: touch
+
+- name: Reset hostname to localhost.localadmin
+  copy:
+    content: 'localhost.localdomain'
+    dest: /etc/hostname
+
+- name: Remove RedHat interface persistence (step 1).
+  file:
+    path: /etc/udev/rules.d/70-persistent-net.rules
+    state: absent
+
+- name: Check for network config file
+  stat:
+    path: /etc/sysconfig/network-scripts/ifcfg-{{ ansible_default_ipv4.interface | default('eth0') }}
+  register: network_config_file
+
+- name: Remove RedHat interface persistence (step 2).
+  lineinfile:
+    dest: "{{ network_config_file.stat.path }}"
+    regexp: "{{ item }}"
+    state: absent
+  loop:
+    - '^HWADDR'
+    - '^UUID'
+    - '^IPADDR'
+    - '^NETMASK'
+    - '^GATEWAY'
+  when: network_config_file.stat.exists
+
+- name: Set interface to DHCP
+  lineinfile:
+    dest: "{{ network_config_file.stat.path }}"
+    regexp: '^BOOTPROTO='
+    line: BOOTPROTO=dhcp
+  when: network_config_file.stat.exists
+
+- name: Force logs to rotate (step 1)
+  shell: /usr/sbin/logrotate -f /etc/logrotate.conf
+  changed_when: false
+
+- name: Find any log files to delete
+  find:
+    paths: /var/log
+    patterns:
+      - "*-????????"
+      - "*.gz"
+  register: find_log_files
+
+- name: Force logs to rotate (step 2)
+  file:
+    path: "{{ item.path }}"
+    state: absent
+  loop: "{{ find_log_files.files }}"
+
+- name: Clear audit log and wtmp (step 1)
+  shell: cat /dev/null > /var/log/audit/audit.log
+  changed_when: false
+
+- name: Clear audit log and wtmp (step 2)
+  shell: cat /dev/null > /var/log/wtmp
+  changed_when: false
+
+- name: Remove ssh-host files
+  command: rm -fr /etc/ssh/ssh_host_*
+  changed_when: false
+  args:
+    warn: false

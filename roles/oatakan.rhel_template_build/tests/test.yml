@@ -1,0 +1,6 @@
+---
+- hosts: localhost
+  remote_user: root
+
+  roles:
+    - oatakan.rhel_template_build

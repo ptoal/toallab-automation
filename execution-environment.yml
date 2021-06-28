@@ -1,0 +1,12 @@
+---
+version: 1
+
+build_arg_defaults:
+  ANSIBLE_RUNNER_IMAGE: 'quay.io/ansible/ansible-runner:stable-2.9-devel'
+
+ansible_config: '../../../.ansible.cfg'
+
+dependencies:
+  galaxy: collections/requirements.yml
+  python: requirements.txt
+  system: bindep.txt

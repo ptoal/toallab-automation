@@ -1,4 +1,4 @@
-# Playbook to build new VMs in RHV Cluster
+# Playbook to build new VMs in RHV Cluste
 # Currently only builds RHEL VMs
 
 # Create Host
@@ -41,28 +41,28 @@
             virtual_machine: "{{ inventory_hostname }}"
         state: new
       register: new_ip
-      when: primary_ipv4 is undefined
+      when: primary_ip4 is undefined
       delegate_to: localhost
 
     - set_fact:
-        primary_ipv4: "{{ new_ip.ip_address.address|ipaddr('address') }}"
+        primary_ip4: "{{ new_ip.ip_address.address|ipaddr('address') }}"
         vm_hostname: "{{ inventory_hostname.split('.')[0] }}"
         vm_domain: "{{ inventory_hostname.split('.',1)[1] }}"
       delegate_to: localhost
-      when: primary_ipv4 is undefined
+      when: primary_ip4 is undefined
 
     - name: Primary IPv4 Assigned in Netbox
       netbox_virtual_machine:
         netbox_url: "{{ netbox_api }}"
         netbox_token: "{{ netbox_token }}"
         data:
-          primary_ip4: "{{ primary_ipv4 }}"
+          primary_ip4: "{{ primary_ip4 }}"
           name: "{{ inventory_hostname }}"
       delegate_to: localhost
 
     - name: Primary IPv4 Address
       debug:
-        var: primary_ipv4
+        var: primary_ip4
 
     - name: Ensure IP Address in IdM
       ipadnsrecord:
@@ -171,7 +171,7 @@
         hostgroup: "RHEL8/RHEL8 Sandbox"
         organization: Toal.ca
         location: Lab
-        ip: "{{ primary_ipv4 }}"
+        ip: "{{ primary_ip4 }}"
         mac: "{{ interface_result.results[0].nic.mac.address }}" #fragile
         build: "{{ vm_result.changed |ternary(true,false) }}"
         validate_certs: no
@@ -224,7 +224,7 @@
     #   netbox_virtual_machine:
     #     data:
     #       name: "{{ inventory_hostname }}"
-    #       primary_ip4: "{{ primary_ipv4 }}"
+    #       primary_ip4: "{{ primary_ip4 }}"
     #     netbox_url: "{{ netbox_api }}"
     #     netbox_token: "{{ netbox_token }}"
     #     state: present      

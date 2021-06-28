@@ -1,0 +1,70 @@
+---
+
+- name: get the datacenter name
+  ovirt.ovirt.ovirt_datacenter_info:
+    auth: "{{ ovirt_auth }}"
+    pattern: "Clusters.name = {{ providers.ovirt.cluster }}"
+  register: datacenter_info
+
+- name: get storage information
+  ovirt.ovirt.ovirt_storage_domain_info:
+    auth: "{{ ovirt_auth }}"
+    pattern: "datacenter={{ datacenter_info.ovirt_datacenters[0].name }}"
+  register: storage_info
+  when:
+    - template_disk_storage is undefined
+
+- name: get data domain
+  set_fact:
+    disk_storage_domain: "{{ storage_info.ovirt_storage_domains|json_query(the_query)|list|first|default(None) }}"
+  when:
+    - template_disk_storage is undefined
+  vars:
+    the_query: "[?type=='data']"
+
+- name: get iso domain (deprecated as of oVirt/RHV 4.3)
+  set_fact:
+    iso_domain: "{{ storage_info.ovirt_storage_domains|json_query(the_query)|list|first|default(None) }}"
+  vars:
+    the_query: "[?type=='iso']"
+
+- name: check if template already exists
+  ovirt.ovirt.ovirt_template_info:
+    auth: "{{ ovirt_auth }}"
+    pattern: "name={{ template.name }} and datacenter={{ datacenter_info.ovirt_datacenters[0].name }}"
+  register: template_info
+
+- block:
+    - name: set template_found to yes
+      set_fact:
+        template_found: yes
+
+    - name: fail with message
+      fail:
+        msg: "Existing template found on ovirt/rhv: {{ template.name }}"
+      when: not template_force|bool
+  when:
+    - template_info.ovirt_templates is defined
+    - template_info.ovirt_templates | length > 0
+
+- name: check iso file on data domain
+  ovirt.ovirt.ovirt_disk_info:
+    auth: "{{ ovirt_auth }}"
+    pattern: "name={{ iso_file_name }}"
+  register: ovirt_disk_main_iso
+  when: iso_file_name is defined
+
+- name: set file id of the iso file
+  set_fact:
+    iso_file_id: "{{ ovirt_disk_main_iso.ovirt_disks[0].id }}"
+  when:
+    - ovirt_disk_main_iso.ovirt_disks | length > 0
+    - ovirt_disk_main_iso.ovirt_disks[0].id is defined
+    - ovirt_disk_main_iso.ovirt_disks[0].content_type == 'iso'
+
+- name: fail with message
+  fail:
+    msg: "iso file ({{ iso_file_name }}) could not be found on the data domain and iso domain does not exists"
+  when:
+    - iso_file_id is undefined
+    - iso_domain is undefined or iso_domain|length == 0

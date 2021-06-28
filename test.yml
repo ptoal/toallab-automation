@@ -1,3 +1,15 @@
 ---
-- name: this is an example
-- name: Task 2
+- name: Create 1Password Secret
+  hosts: localhost
+  tasks:
+    - onepassword.connect.generic_item:
+        vault_id: "e63n3krpqx7qpohuvlyqpn6m34"
+        title: Lab Secrets Test
+        state: created
+        fields:
+          - label: Codeword
+            value: "hunter2"
+            section: "Personal Info"
+            field_type: concealed
+      # no_log: true
+      register: op_item

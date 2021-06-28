@@ -1,0 +1,19 @@
+---
+
+target_vagrant: no
+target_ovirt: no
+
+local_account_username: ansible
+local_account_password: Chang3MyP@ssw0rd21
+
+ovirt_guest_agent_service_name: ovirt-guest-agent
+qemu_guest_agent_service_name: qemu-guest-agent
+
+ovirt_guest_agent_package_name:
+  RedHat: rhevm-guest-agent-common
+  CentOS: ovirt-guest-agent-common
+
+qemu_guest_agent_package_name: qemu-guest-agent
+
+the_root_vgname: vg00
+the_root_lvname: root
