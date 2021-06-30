@@ -2,7 +2,7 @@
 
 - name: validate file
   stat:
-    path: "{{ playbook_dir }}/{{ temp_directory }}/linux_{{ linux_distro_name }}_ks_autogen.iso"
+    path: "{{ playbook_dir }}/{{ temp_directory }}/linux_{{ distro_name }}_ks_autogen.iso"
     get_checksum: no
   register: iso_file_check
 

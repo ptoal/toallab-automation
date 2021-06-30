@@ -50,8 +50,8 @@ Including an example of how to use your role (for instance, with variables passe
         export_ovf: no # export the template to export domain upon creation
         local_account_password: ''
         local_administrator_password: ''
-        linux_distro_name: rhel_81 # this needs to be one of the standard values see 'os_short_names' var
-        template_vm_name: rhel81-x64-v1
+        distro_name: rhel8 # this needs to be one of the standard values see 'os_short_names' var
+        template_vm_name: rhel84-x64-v1
         template_vm_root_disk_size: 10
         template_vm_memory: 4096
         template_vm_efi: false # you need to install efi file to use this, false should be fine in most cases

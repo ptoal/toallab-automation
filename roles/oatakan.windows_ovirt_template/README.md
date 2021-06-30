@@ -47,7 +47,7 @@ Including an example of how to use your role (for instance, with variables passe
         export_ovf: no # export the template to export domain upon creation
         local_account_password: ''
         local_administrator_password: ''
-        windows_distro_name: 2019_standard # this needs to be one of the standard values see 'os_short_names' var
+        distro_name: win2019 # this needs to be one of the standard values see 'os_short_names' var
         template_vm_name: win2019_template
         template_vm_root_disk_size: 30
         template_vm_guest_id: windows_2019x64

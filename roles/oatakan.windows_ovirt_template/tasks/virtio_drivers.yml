@@ -12,8 +12,8 @@
 - name: set list of directories to copy
   set_fact:
     virtio_iso_list_of_directories_to_extract:
-      - /viostor/{{ os_short_names[windows_distro_name] | default('2k16') }}/amd64
-      - /NetKVM/{{ os_short_names[windows_distro_name] | default('2k16') }}/amd64
+      - /viostor/{{ os_short_names[distro_name] | default('2k16') }}/amd64
+      - /NetKVM/{{ os_short_names[distro_name] | default('2k16') }}/amd64
 
 - name: get a list of files from template iso
   shell: >

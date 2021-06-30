@@ -22,6 +22,6 @@
 - name: ikke_t.container_image_cleanup
 
 # Infra
-#- name: bertvv.bind
-#- name: bertvv.dhcp
+- name: sage905.dhcp
+  src: https://github.com/ptoal/ansible-role-dhcp.git
 - name: linux-system-roles.network

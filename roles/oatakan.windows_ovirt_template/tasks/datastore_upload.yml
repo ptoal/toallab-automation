@@ -2,7 +2,7 @@
 
 - name: validate file
   stat:
-    path: "{{ playbook_dir }}/{{ temp_directory }}/windows_{{ windows_distro_name }}_autounattend_autogen.iso"
+    path: "{{ playbook_dir }}/{{ temp_directory }}/windows_{{ distro_name }}_autounattend_autogen.iso"
     get_checksum: no
   register: iso_file_check
 

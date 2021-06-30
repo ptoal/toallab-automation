@@ -23,7 +23,7 @@
       include_tasks: virtio_drivers.yml
 
     - name: create iso
-      command: mkisofs -V ADDISO -r -iso-level 4 -o {{ playbook_dir }}/{{ temp_directory }}/windows_{{ windows_distro_name }}_autounattend_autogen.iso .
+      command: mkisofs -V ADDISO -r -iso-level 4 -o {{ playbook_dir }}/{{ temp_directory }}/windows_{{ distro_name }}_autounattend_autogen.iso .
       args:
         chdir: "{{ playbook_dir }}/{{ temp_directory }}/ks_iso"
 
@@ -34,6 +34,6 @@
         path: "{{ temp_directory }}/{{ item }}"
         state: absent
       loop:
-        - windows_{{ windows_distro_name }}_autounattend_autogen.iso
+        - windows_{{ distro_name }}_autounattend_autogen.iso
         - virtio_win.iso
         - ks_iso/
