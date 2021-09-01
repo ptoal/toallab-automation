@@ -1,0 +1,46 @@
+- name: Publish CVs
+  hosts: satellite1.mgmt.toal.ca
+  vars:
+    sat_env_name: Library
+    sat_org: Toal.ca
+    sat_publish_description: Automated CV Update
+
+  tasks:
+  - name: Pre-tasks | Find all CVs
+    redhat.satellite.resource_info:
+      username: "{{ satellite_admin_user }}"
+      password: "{{ satellite_admin_pass }}"
+      server_url: "{{ satellite_url }}"
+      organization: "{{ sat_org }}"
+      resource: content_views
+      validate_certs: no
+    register: raw_list_cvs
+
+  - name: Pre-tasks | Get resource information
+    set_fact:
+      list_all_cvs: "{{ raw_list_cvs['resources'] | json_query(jmesquery) | list }}"
+    vars: 
+      jmesquery: "[*].{name: name, composite: composite, id: id}"
+    
+  - name: Pre-tasks | Extract list of content views
+    set_fact:
+      sat6_content_views_list: "{{ sat6_content_views_list|default([]) }} + ['{{ item.name }}' ]"
+    loop: "{{ list_all_cvs | reject('search', 'Default_Organization_View') | list }}"
+    when: item.composite == false 
+
+  - name: Publish content
+    redhat.satellite.content_view_version:
+      username: "{{ satellite_admin_user }}"
+      password: "{{ satellite_admin_pass }}"
+      server_url: "{{ satellite_url }}"
+      organization: "{{ sat_org }}"
+      content_view: "{{ item }}"
+      validate_certs: no
+      description: "{{ sat_publish_description }}"
+      lifecycle_environments:
+        - Library
+        - "{{ sat_env_name }}"
+    loop: "{{ sat6_content_views_list | list }}"
+    loop_control:
+      loop_var: "item"
+    register: cv_publish_sleeper

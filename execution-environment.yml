@@ -2,7 +2,7 @@
 version: 1
 
 build_arg_defaults:
-  ANSIBLE_RUNNER_IMAGE: 'quay.io/ansible/ansible-runner:stable-2.9-devel'
+  EE_BASE_IMAGE: 'quay.io/ansible/ansible-runner:stable-2.10-devel'
 
 ansible_config: '../../../.ansible.cfg'
 

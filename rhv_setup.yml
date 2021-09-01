@@ -2,6 +2,9 @@
 - name: Check for existing cert
   hosts: rhv.mgmt.toal.ca
   connection: local
+  vars:
+    ansible_python_interpreter: "/usr/bin/python3"
+
 
   tasks:
     - name: Information from existing key
@@ -66,6 +69,7 @@
   become: true
   vars:
     key_files_prefix: "keys/{{ acme_certificate_domains|first }}"
+    ansible_python_interpreter: "/usr/bin/python3"
 
   tasks:
     - name: Certificate trust in store
@@ -104,22 +108,28 @@
     - name: Private key installed
       copy:
         src: "{{ key_files_prefix }}.key"
-        dest: /etc/pki/ovirt-engine/keys/apache.key.nopass
+        dest: "{{ item }}"
         backup: yes
         owner: root
         group: ovirt
-        mode: 640
+        mode: 0640
       notify: restart httpd
+      loop:
+        - /etc/pki/ovirt-engine/keys/apache.key.nopass
+        - /etc/pki/ovirt-engine/keys/websocket-proxy.key.nopass
 
     - name: Certificate installed
       copy:
         src: "{{ key_files_prefix }}.pem"
-        dest: /etc/pki/ovirt-engine/certs/apache.cer
+        dest: "{{ item }}"
         backup: yes
         owner: root
         group: ovirt
-        mode: 644
+        mode: 0644
       notify: restart httpd
+      loop:
+        - /etc/pki/ovirt-engine/certs/websocket-proxy.cer
+        - /etc/pki/ovirt-engine/certs/apache.cer
 
     - name: Trust Store Configuration
       copy:
@@ -136,10 +146,15 @@
           path: /etc/ovirt-engine/ovirt-websocket-proxy.conf.d/10-setup.conf
           state: present
           backup: yes
-          line: "{{ item }}"
+          line: "{{ item.name }}={{ item.value }}"
+          regexp: "^{{ item.name }}="
       loop:
-        - SSL_CERTIFICATE=/etc/pki/ovirt-engine/apache.cer
-        - SSL_KEY=/etc/pki/ovirt-engine/keys/apache.key.nopass
+        - name: SSL_CERTIFICATE
+          value: /etc/pki/ovirt-engine/certs/websocket-proxy.cer
+        - name: SSL_KEY
+          value: /etc/pki/ovirt-engine/keys/websocket-proxy.key.nopass
+        # - SSL_CERTIFICATE=/etc/pki/ovirt-engine/certs/apache.cer
+        # - SSL_KEY=/etc/pki/ovirt-engine/keys/apache.key.nopass
       notify:
         - restart ovirt-websocket-proxy
 
@@ -177,10 +192,9 @@
   tasks:
     - name: Obtain SSO token for RHV
       ovirt_auth:
-        url: "{{ ovirt_url }}"
-        username: "{{ ovirt_username }}"
+        state: present
         insecure: true
-        password: "{{ ovirt_password }}"
+  
 
     - ovirt_network:
         auth: "{{ ovirt_auth }}"

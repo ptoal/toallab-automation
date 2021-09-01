@@ -35,3 +35,4 @@ collections:
     source: https://galaxy.ansible.com
 
   - name: onepassword.connect
+  - name: ansible.posix

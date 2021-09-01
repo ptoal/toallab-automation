@@ -53,8 +53,6 @@
             state: absent
             ovirt_auth: "{{ ovirt_auth }}"
 
-  collections:
-    - redhat.rhv
 
 # - name: VM Configuration
 # - name: Automation Platform Installer

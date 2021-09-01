@@ -114,3 +114,4 @@ keys/
 collections/ansible_collections/
 .vscode/
 .vaultpw
+context/
