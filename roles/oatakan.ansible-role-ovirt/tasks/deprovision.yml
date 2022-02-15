@@ -58,7 +58,7 @@
   until: disks_deletion.finished
   retries: "{{ instance_wait_retry_limit }}"
   delay: 10
-  with_items: "{{ delete_disks.results }}"
+  loop: "{{ delete_disks.results }}"
   when:
     - nodes is defined
     - delete_disks.results is defined

@@ -38,10 +38,19 @@
 - name: set systemd scope to system if needed
   set_fact:
     systemd_scope: system
-    service_files_dir: '/etc/systemd/system'
+    service_files_dir: /usr/local/lib/systemd/system
     xdg_runtime_dir: "/run/user/{{ container_run_as_uid.stdout }}"
   when: container_run_as_user == "root"
   changed_when: false
+
+- name: create local systemd directory
+  when: service_files_dir == '/usr/local/lib/systemd/system'
+  file:
+    group: root
+    mode: u=rwX,go=rX
+    owner: root
+    path: /usr/local/lib/systemd/system/
+    state: directory
 
 - name: check if service file exists already
   stat:
@@ -95,6 +104,7 @@
     # https://github.com/containers/libpod/issues/5570
     # command: podman inspect -f {{.Id}} "{{ container_image }}"
     command: "podman image inspect -f '{{ '{{' }}.Id{{ '}}' }}' {{ item }}"
+    changed_when: false
     register: pre_pull_id
     ignore_errors: true
     when:
@@ -121,6 +131,7 @@
   - name: running single container, get image Id if it exists
     command:
       "podman image inspect -f '{{ '{{' }}.Id{{ '}}' }}'  {{ item }}"
+    changed_when: false
     become: true
     become_user: "{{ container_run_as_user }}"
     register: post_pull_id
@@ -204,6 +215,18 @@
       - service_file_before_template.stat.exists
       - service_file.changed
 
+  - name: ensure auto update is running for images
+    become: true
+    become_user: "{{ container_run_as_user }}"
+    environment:
+      XDG_RUNTIME_DIR: "{{ xdg_runtime_dir }}"
+    systemd:
+      name: podman-auto-update.timer
+      daemon_reload: true
+      scope: "{{ systemd_scope }}"
+      state: started
+      enabled: true
+
   when: container_state == "running"
 
 - name: configure firewall if container_firewall_ports is defined
@@ -247,7 +270,7 @@
 
   - name: ensure container's exposed ports firewall state
     tags: firewall
-    firewalld:
+    ansible.posix.firewalld:
       port: "{{ item }}"
       permanent: true
       immediate: true

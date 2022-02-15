@@ -2,8 +2,8 @@
 
 - name: Set the virtio_win_iso_path and virtio_win_virtio_path
   set_fact:
-    virtio_win_iso_path: '{{ win_disk_image.mount_path | default(virtio_iso_mount_drive) }}'
-    virtio_win_virtio_path: "{{ (win_disk_image.mount_path | default(virtio_iso_mount_drive)) + '\\virtio' if virtio_win_ovirt else (win_disk_image.mount_path | default(virtio_iso_mount_drive)) }}"
+    virtio_win_iso_path: '{{ win_disk_image.mount_paths[0] | default(virtio_iso_mount_drive) }}'
+    virtio_win_virtio_path: "{{ (win_disk_image.mount_paths[0] | default(virtio_iso_mount_drive)) + '\\virtio' if virtio_win_ovirt else (win_disk_image.mount_paths[0] | default(virtio_iso_mount_drive)) }}"
     virtio_win_iso_name: "{{ virtio_win_iso_name }}"
   when:
     - virtio_iso_mount_drive | length > 0 or ('Windows Server 2008' not in ansible_distribution and 'Windows 7' not in ansible_distribution)

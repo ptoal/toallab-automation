@@ -58,9 +58,11 @@
     - debug:
         msg: |
           {{ inventory_hostname }} has {{ missing_updates.found_update_count }} updates still missing.
-          {% for key, value in missing_updates.updates.items() %}
-            - {{ value.title }}
+          {% for update in updates %}
+            - {{ update.title }}
           {% endfor %}
+      vars:
+        updates: "{{ (missing_updates.updates.values() | list) if (missing_updates.updates is mapping) else (missing_updates.updates) }}"
       when: missing_updates.updates is defined
 
     - name: still more updates - need to retry

@@ -3,6 +3,7 @@
 install_updates: yes
 instance_wait_retry_limit: 300
 instance_wait_connection_timeout: 400
+instance_stop_retry_limit: 60
 
 # this will remove existing template with the same name
 template_force: no
@@ -73,4 +74,5 @@ os_short_names:
   win2012: 2k12R2
   win2016: 2k16
   win2019: 2k19
-  win10: 10
+  win2022: 2k19 # 2k22 is not *yet* available on virtio iso
+  win10: w10

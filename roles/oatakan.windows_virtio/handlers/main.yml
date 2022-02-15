@@ -4,7 +4,7 @@
   win_disk_image:
     image_path: "{{ ansible_env.TEMP }}\\{{ virtio_win_iso_name }}"
     state: absent
-  when: win_disk_image.mount_path is defined
+  when: win_disk_image.mount_paths is defined
 
 - name: Delete downloaded
   win_file:

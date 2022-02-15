@@ -48,7 +48,7 @@
   retries: "{{ instance_wait_retry_limit }}"
   delay: 10
   no_log: true
-  with_items: "{{ deploy.results }}"
+  loop: "{{ deploy.results }}"
   when:
     - nodes is defined
     - deploy.results is defined
@@ -85,7 +85,7 @@
   until: disks_creation.finished
   retries: "{{ instance_wait_retry_limit }}"
   delay: 10
-  with_items: "{{ create_disks.results }}"
+  loop: "{{ create_disks.results }}"
   when:
     - nodes is defined
     - create_disks.results is defined
@@ -110,7 +110,7 @@
       nic_name: "{{ item.networks[0].nic_name | default(item.networks[0].device_name) | default('eth0') }}"
       nic_on_boot: true
       host_name: "{{ item.name }}.{{ item.domain | default('') }}"
-      dns_servers: "{{ item.dns_servers|join(' ') | default([]) }}"
+      dns_servers: "{{ (item.dns_servers | default([])) | join(' ') }}"
       custom_script: "{{ item.custom_script | default('') }}"
       user_name: "{{ item.user_name | default('') }}"
       root_password: "{{ item.root_password | default('') }}"
@@ -144,7 +144,7 @@
 - name: combine deployment results
   set_fact:
     deploy_results: "{{ deploy_results|default([]) + [ item ] }}"
-  with_items: "{{ deploy_linux.results + deploy_windows.results }}"
+  loop: "{{ deploy_linux.results + deploy_windows.results }}"
   when:
     - nodes is defined
     - item.ansible_job_id is defined
@@ -156,7 +156,7 @@
   until: instances.finished
   retries: "{{ instance_wait_retry_limit }}"
   delay: 10
-  with_items: "{{ deploy_results }}"
+  loop: "{{ deploy_results }}"
   when:
     - nodes is defined
     - deploy_results is defined

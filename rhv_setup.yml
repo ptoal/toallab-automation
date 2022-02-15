@@ -13,6 +13,8 @@
       ignore_errors: yes
       register: key_info
 
+    - set_fact: have_valid_cert=false
+
     - set_fact:
         have_valid_cert: "{{ (key_info.not_after|to_datetime('%Y%m%d%H%M%SZ')).timestamp() > ansible_date_time.epoch|int + 2592000 }}"
       when:
@@ -24,8 +26,8 @@
   connection: local
   gather_facts: false
   # This doesn't belong here
-  vars:
-    acme_certificate_root_certificate: https://letsencrypt.org/certs/trustid-x3-root.pem.txt
+  #vars:
+  #  acme_certificate_root_certificate: https://letsencrypt.org/certs/trustid-x3-root.pem.txt
 
 
   pre_tasks:
@@ -56,7 +58,7 @@
 
   roles:
     - name: felixfontein.acme_certificate
-      when: not have_valid_cert
+      when: have_valid_cert is defined and not have_valid_cert
 
   post_tasks:
     - name: Remove tempfile
@@ -209,3 +211,11 @@
       register: networkinfo
 
     - debug: msg="{{networkinfo}}"
+
+- name: Reminder
+  hosts: localhost
+  connection: local
+  tasks:
+  - name: Reminder
+    debug: "Don't forget to add tso off gro off gso off lro off to i217-LM NIC's (eg: Dell Optiplex)!"
+# https://access.redhat.com/documentation/en-us/red_hat_virtualization/4.4/html/administration_guide/sect-hosts_and_networking#Editing_Host_Network_Interfaces_and_Assigning_Logical_Networks_to_Hosts

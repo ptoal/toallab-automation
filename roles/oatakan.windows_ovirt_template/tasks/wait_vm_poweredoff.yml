@@ -10,4 +10,4 @@
     - ovirt_vm_info_result.ovirt_vms|length > 0
     - ovirt_vm_info_result.ovirt_vms[0].status == 'down'
   delay: 5
-  retries: 30
+  retries: "{{ instance_stop_retry_limit }}"

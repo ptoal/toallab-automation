@@ -5,15 +5,9 @@ remove_apps: no
 clean_up_components: yes
 upgrade_powershell: no
 powershell_target_version: 3.0
-temp_directory: "{{ ansible_env.TEMP }}"
+default_temp_directory: 'C:\Windows\Temp'
 update_retry_limit: 10
 upgrade_wait_timeout: 600
-
-powershell_script_url: https://raw.githubusercontent.com/oatakan/ansible-role-windows-template-build/master/files/Upgrade-PowerShell.ps1
-powershell_upgrade_script_file: 'C:\Upgrade-PowerShell.ps1'
-
-ps_memfix_script_url: https://raw.githubusercontent.com/oatakan/ansible-role-windows-template-build/master/files/Install-WMF3Hotfix.ps1
-ps_memfix_script_file: 'C:\Install-WMF3Hotfix.ps1'
 
 set_network_to_private: '([Activator]::CreateInstance([Type]::GetTypeFromCLSID([Guid]"{DCB00C01-570F-4A9B-8D69-199FDBA5723B}"))).GetNetworkConnections() | % {$_.GetNetwork().SetCategory(1)}'
 
@@ -24,24 +18,36 @@ enable_tlsv12_hotfix:
   url: https://download.microsoft.com/download/F/4/1/F4154AD2-2119-48B4-BF99-CC15F68E110D/Windows6.1-KB3080079-x64.msu
 
 enable_tls_support_hotfix_download_location: 'C:\Windows\Temp'
+# no longer available
+#enable_tls_support_hotfix:
+#  kb: kb3154518
+#  file: windows6.1-kb3154518-x64.msu
+#  url: http://download.microsoft.com/download/6/8/0/680ee424-358c-4fdf-a0de-b45dee07b711/windows6.1-kb3154518-x64.msu
+
+# fix: https://support.microsoft.com/en-us/topic/security-and-quality-rollup-for-net-framework-3-5-1-for-windows-7-sp1-and-windows-server-2008-r2-sp1-kb-4040980-71f9f600-4878-a9d4-6b36-93cafad2eefe
 enable_tls_support_hotfix:
-  kb: kb3154518
-  file: windows6.1-kb3154518-x64.msu
-  url: http://download.microsoft.com/download/6/8/0/680ee424-358c-4fdf-a0de-b45dee07b711/windows6.1-kb3154518-x64.msu
+  kb: kb4040980
+  file: windows6.1-kb4040980-x64_83282fb5210091802984ead0d4175879056d602c.msu
+  url: http://download.windowsupdate.com/c/msdownload/update/software/secu/2017/09/windows6.1-kb4040980-x64_83282fb5210091802984ead0d4175879056d602c.msu
 
 dot_net_security_hotfix_download_location: 'C:\Windows\Temp'
+# no longer available
+#dot_net_security_hotfix:
+#  kb: KB2898850
+#  file: Windows8.1-KB2898850-x64.msu
+#  url: http://download.microsoft.com/download/C/6/9/C690CC33-18F7-405D-B18A-0A8E199E531C/Windows8.1-KB2898850-x64.msu
+
 dot_net_security_hotfix:
   kb: KB2898850
-  file: Windows8.1-KB2898850-x64.msu
-  url: http://download.microsoft.com/download/C/6/9/C690CC33-18F7-405D-B18A-0A8E199E531C/Windows8.1-KB2898850-x64.msu
+  file: windows8.1-kb2898850-x64_9ffdfdeac9011569d1b14cf2dbf926257c50186d.msu
+  url: http://download.windowsupdate.com/d/msdownload/update/software/secu/2014/04/windows8.1-kb2898850-x64_9ffdfdeac9011569d1b14cf2dbf926257c50186d.msu
 
 windows_update_agent_url: http://download.windowsupdate.com/windowsupdate/redist/standalone/7.6.7600.320/windowsupdateagent-7.6-x64.exe
 
 #sdelete_download_url: http://web.archive.org/web/20140902022253/http://download.sysinternals.com/files/SDelete.zip
 bleachbit_download_url: https://download.bleachbit.org/BleachBit-4.0.0-portable.zip
 sdelete_download_url: https://download.sysinternals.com/files/SDelete.zip
-#ultradefrag_download_url: http://downloads.sourceforge.net/project/ultradefrag/stable-release/6.1.0/ultradefrag-portable-6.1.0.bin.amd64.zip
-ultradefrag_download_url: https://sourceforge.net/projects/ultradefrag/files/stable-release/7.1.4/ultradefrag-portable-7.1.4.bin.amd64.zip/download
+ultradefrag_download_url: https://downloads.sourceforge.net/project/ultradefrag/stable-release/7.1.4/ultradefrag-portable-7.1.4.bin.amd64.zip
 
 enable_auto_logon: yes
 
@@ -59,6 +65,7 @@ virtio_role: oatakan.windows_virtio
 vmware_tools_role: oatakan.windows_vmware_tools
 virtualbox_guest_additions_role: oatakan.windows_virtualbox_guest_additions
 windows_update_role: oatakan.windows_update
+windows_powershell_upgrade_role: oatakan.windows_powershell_upgrade
 
 policy:
   allow_unauthenticated_guest_access: no

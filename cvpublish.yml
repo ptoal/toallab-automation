@@ -25,7 +25,7 @@
   - name: Pre-tasks | Extract list of content views
     set_fact:
       sat6_content_views_list: "{{ sat6_content_views_list|default([]) }} + ['{{ item.name }}' ]"
-    loop: "{{ list_all_cvs | reject('search', 'Default_Organization_View') | list }}"
+    loop: "{{ list_all_cvs | reject('search', 'Default Organization View') | list }}"
     when: item.composite == false 
 
   - name: Publish content

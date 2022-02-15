@@ -7,7 +7,7 @@ container_state: running
 # see man systemd.service for info
 # by default we want to restart failed container
 container_restart: on-failure
-service_files_dir: /etc/systemd/system
+service_files_dir: /usr/local/lib/systemd/system
 systemd_scope: system
 systemd_TimeoutStartSec: 15
 systemd_RestartSec: 30
@@ -16,6 +16,15 @@ systemd_tempdir: "{{ '/tmp' if ansible_os_family == 'RedHat' and
 container_run_as_user: root
 container_run_as_group: root
 container_stop_timeout: 15
+
+# SystemD dependencies (some are hardcoded; see templates)
+systemd_After: [network.target]
+systemd_Before: []
+systemd_Conflicts: []
+systemd_RequiredBy: []
+systemd_Requires: []
+systemd_WantedBy: []
+systemd_Wants: []
 
 # systemd service name
 service_name: "{{ container_name }}-container-pod-{{ container_run_as_user }}.service"

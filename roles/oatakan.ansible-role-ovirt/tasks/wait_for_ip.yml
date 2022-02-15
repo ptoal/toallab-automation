@@ -1,31 +1,33 @@
 ---
 
-#- name: waiting for ip address to be assigned
-#  ovirt_nic_info:
-#    auth: "{{ ovirt_auth }}"
-#    vm: "{{ item.vm.name }}"
-#    name: nic1
-#  register: nics
-#  until:
-#    - nics.ovirt_nics | length > 0
-#    - nics.ovirt_nics[0].reported_devices | length > 0
-#    - nics.ovirt_nics[0].reported_devices[0].ips is defined
-#    - nics.ovirt_nics[0].reported_devices[0].ips | length > 0
-#    - nics.ovirt_nics[0].reported_devices[0].ips[0].address is defined
-#    - nics.ovirt_nics[0].reported_devices[0].ips[0].version == 'v4'
-#  retries: 300
-#  delay: 10
-#  with_items: "{{ instances.results }}"
-#  when:
-#    - nodes is defined
-#    - instances.results is defined
-#    - item.vm is defined
+- name: waiting for ip address to be assigned
+  ovirt_nic_info:
+    auth: "{{ ovirt_auth }}"
+    vm: "{{ item.vm.name }}"
+    name: nic1
+    fetch_nested: yes
+    nested_attributes:
+      - ips
+  register: nics
+  until:
+    - nics.ovirt_nics | length > 0
+    - nics.ovirt_nics[0].reported_devices | length > 0
+    - reported_ipv4_addresses | length
+  retries: 300
+  delay: 10
+  loop: "{{ instances.results }}"
+  when:
+    - nodes is defined
+    - instances.results is defined
+    - item.vm is defined
+  vars:
+    reported_ipv4_addresses: "{{ (nics.ovirt_nics[0].reported_devices | json_query('[*].ips[?version==`v4`].address') | flatten) | default([]) }}"
 
 - name: waiting for servers to come online on predefined ip
   wait_for:
     host: "{{ item.networks[0].ip }}"
     port: "{{ item.ansible_port | default(ansible_port) | default('22') }}"
-  with_items: "{{ nodes }}"
+  loop: "{{ nodes }}"
   when:
     - nodes is defined
     - item.networks is defined
@@ -33,9 +35,9 @@
 
 - name: waiting for servers to come online on dhcp ip
   wait_for:
-    host: "{{ (item.ovirt_nics[0].reported_devices[0].ips | json_query('[?version==`v4`].address'))[0] }}"
+    host: "{{ (item.ovirt_nics[0].reported_devices | json_query('[*].ips[?version==`v4`].address'))[0][0] | default('') }}"
     port: "{{ item.item.item.item.ansible_port | default(ansible_port) | default('22') }}"
-  with_items: "{{ nics.results }}"
+  loop: "{{ nics.results }}"
   when:
     - nodes is defined
     - nics.results is defined
@@ -55,15 +57,14 @@
   until:
     - nics.ovirt_nics | length > 0
     - nics.ovirt_nics[0].reported_devices | length > 0
-    - nics.ovirt_nics[0].reported_devices[0].ips | length > 0
-    - nics.ovirt_nics[0].reported_devices[0].ips[0].address is defined
-    - nics.ovirt_nics[0].reported_devices[0].ips[0].version == 'v4'
-    - nics.ovirt_nics[0].reported_devices[0].ips[0].address == item.networks[0].ip
+    - item.networks[0].ip in reported_ipv4_addresses
   retries: "{{ ip_wait_retry_limit }}"
   delay: 10
-  with_items: "{{ nodes }}"
+  loop: "{{ nodes }}"
   when:
     - wait_for_static_ip_assigned|bool
     - nodes is defined
     - item.networks | length > 0
     - item.networks[0].ip is defined
+  vars:
+    reported_ipv4_addresses: "{{ (nics.ovirt_nics[0].reported_devices | json_query('[*].ips[?version==`v4`].address') | flatten) | default([]) }}"
