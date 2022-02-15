@@ -1,7 +1,0 @@
-gns3fy>=0.5.2  # from collection davidban77.gns3
-ovirt-engine-sdk-python>=4.4.10,>=4.4.10  # from collection ovirt.ovirt,redhat.rhv
-requests>=2.4.2  # from collection redhat.satellite
-ipaddress  # from collection redhat.satellite
-pynetbox  # from collection user
-boto3  # from collection user
-packaging  # from collection user

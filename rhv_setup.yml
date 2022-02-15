@@ -216,6 +216,7 @@
   hosts: localhost
   connection: local
   tasks:
-  - name: Reminder
-    debug: "Don't forget to add tso off gro off gso off lro off to i217-LM NIC's (eg: Dell Optiplex)!"
+    - name: Reminder
+      debug:
+        msg: "Don't forget to add tso off gro off gso off lro off to i217-LM NIC's (eg: Dell Optiplex)!"
 # https://access.redhat.com/documentation/en-us/red_hat_virtualization/4.4/html/administration_guide/sect-hosts_and_networking#Editing_Host_Network_Interfaces_and_Assigning_Logical_Networks_to_Hosts
