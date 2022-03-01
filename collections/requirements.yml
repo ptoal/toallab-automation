@@ -34,5 +34,5 @@ collections:
   - name: community.crypto
     source: https://galaxy.ansible.com
 
-##  - name: onepassword.connect
+  - name: onepassword.connect
 #  - name: ansible.posix
