@@ -22,7 +22,6 @@
         name: "rhel8build.sandbox.toal.ca"
         operatingsystem: "RedHat 8.3"
         organization: "Toal.ca"
-        password: "{{ vault_sat6_pass }}"
         server_url: "https://satellite1.mgmt.toal.ca/"
         subnet: "sandbox"
         username: "{{ satellite_admin_user }}"

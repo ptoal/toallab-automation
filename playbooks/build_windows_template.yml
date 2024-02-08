@@ -1,12 +1,12 @@
-- name: create an ovirt windows template
+- name: Create an ovirt windows template
   hosts: windows_template_base
-  gather_facts: False
+  gather_facts: false
   connection: local
-  become: no
+  become: false
 
   vars:
     ansible_python_interpreter: "{{ ansible_playbook_python }}"
-      
+
 
   roles:
     - oatakan.windows_ovirt_template
