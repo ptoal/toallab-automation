@@ -1,3 +1,0 @@
-pynetbox
-boto3
-packaging
