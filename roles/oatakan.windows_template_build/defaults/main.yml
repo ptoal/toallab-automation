@@ -1,46 +1,76 @@
 ---
 
-install_updates: yes
-remove_apps: no
-clean_up_components: yes
-upgrade_powershell: no
+install_updates: true
+remove_apps: false
+clean_up_components: true
+upgrade_powershell: false
 powershell_target_version: 3.0
 default_temp_directory: 'C:\Windows\Temp'
 update_retry_limit: 10
 upgrade_wait_timeout: 600
 
-set_network_to_private: '([Activator]::CreateInstance([Type]::GetTypeFromCLSID([Guid]"{DCB00C01-570F-4A9B-8D69-199FDBA5723B}"))).GetNetworkConnections() | % {$_.GetNetwork().SetCategory(1)}'
+win_update_server: '' #wsus server ip/hostname
 
-enable_tlsv12_hotfix_download_location: "{{ ansible_env.TEMP }}"
-enable_tlsv12_hotfix:
-  kb: KB3080079
-  file: Windows6.1-KB3080079-x64.msu
-  url: https://download.microsoft.com/download/F/4/1/F4154AD2-2119-48B4-BF99-CC15F68E110D/Windows6.1-KB3080079-x64.msu
+set_network_to_private: "([Activator]::CreateInstance([Type]::GetTypeFromCLSID([Guid]'{DCB00C01-570F-4A9B-8D69-199FDBA5723B}'))).GetNetworkConnections() | % {$_.GetNetwork().SetCategory(1)}"
+expand_disk: !unsafe "$i=(gwmi -n root/cimv2 Win32_DiskPartition|?{$_.BootPartition }).Index;'sel dis 0',\\\"sel par $($i*2+2)\\\",'extend'|& diskpart *>$null"
 
-enable_tls_support_hotfix_download_location: 'C:\Windows\Temp'
-# no longer available
-#enable_tls_support_hotfix:
-#  kb: kb3154518
-#  file: windows6.1-kb3154518-x64.msu
-#  url: http://download.microsoft.com/download/6/8/0/680ee424-358c-4fdf-a0de-b45dee07b711/windows6.1-kb3154518-x64.msu
+win2008_hotfixes:
+  # this update is needed to support ssl support on Windows Server 2008 R2
+  - kb: KB4474419
+    file: windows6.1-kb4474419-v3-x64_b5614c6cea5cb4e198717789633dca16308ef79c.msu
+    url: http://catalog.s.download.windowsupdate.com/c/msdownload/update/software/secu/2019/09/windows6.1-kb4474419-v3-x64_b5614c6cea5cb4e198717789633dca16308ef79c.msu
+  # this is servicing stack update to enable any recent updates
+  - kb: KB3080079
+    file: Windows6.1-KB3080079-x64.msu
+    url: https://download.microsoft.com/download/F/4/1/F4154AD2-2119-48B4-BF99-CC15F68E110D/Windows6.1-KB3080079-x64.msu
 
-# fix: https://support.microsoft.com/en-us/topic/security-and-quality-rollup-for-net-framework-3-5-1-for-windows-7-sp1-and-windows-server-2008-r2-sp1-kb-4040980-71f9f600-4878-a9d4-6b36-93cafad2eefe
-enable_tls_support_hotfix:
-  kb: kb4040980
-  file: windows6.1-kb4040980-x64_83282fb5210091802984ead0d4175879056d602c.msu
-  url: http://download.windowsupdate.com/c/msdownload/update/software/secu/2017/09/windows6.1-kb4040980-x64_83282fb5210091802984ead0d4175879056d602c.msu
+win2012_hotfixes:
+  os_6_2:
+    - kb: KB2901982
+      file: windows8-rt-kb2901982-x64_21dae8200edae3339a8c8580e516e00d7dacdfe3.msu
+      url: http://catalog.s.download.windowsupdate.com/d/msdownload/update/software/ftpk/2015/01/windows8-rt-kb2901982-x64_21dae8200edae3339a8c8580e516e00d7dacdfe3.msu
+  os_6_3:
+    # this update is needed to enable .NET clients to use https (tslv12) on Windows 8.1 and Windows Server 2012 R2
+    # see https://www.microsoft.com/en-us/download/confirmation.aspx?id=42883
+    - kb: KB2978041
+      file: windows8.1-kb2978041-x64_93d7dd68c7487670c0ab4d5eb154a0ef5e40a306.msu
+      url: http://download.windowsupdate.com/c/msdownload/update/software/secu/2014/09/windows8.1-kb2978041-x64_93d7dd68c7487670c0ab4d5eb154a0ef5e40a306.msu
+    # this is servicing stack update to enable any recent updates
+    - kb: KB5018922
+      file: windows8.1-kb5018922-x64_3aa7832b7586e11304f8fee5e09b6829b32d1833.msu
+      url: https://catalog.s.download.windowsupdate.com/c/msdownload/update/software/secu/2022/10/windows8.1-kb5018922-x64_3aa7832b7586e11304f8fee5e09b6829b32d1833.msu
+    # this a security update, it updates cipher suite for TLS, which prevents 'SSL: DH_KEY_TOO_SMALL' error with credssp
+    - kb: KB3042058
+      file: windows8.1-kb3042058-x64_c73bfac2ad93aed131627e7482bacbd89d0a0850.msu
+      url: https://catalog.s.download.windowsupdate.com/d/msdownload/update/software/secu/2015/09/windows8.1-kb3042058-x64_c73bfac2ad93aed131627e7482bacbd89d0a0850.msu
+      enable_winrm: true
 
-dot_net_security_hotfix_download_location: 'C:\Windows\Temp'
-# no longer available
-#dot_net_security_hotfix:
-#  kb: KB2898850
-#  file: Windows8.1-KB2898850-x64.msu
-#  url: http://download.microsoft.com/download/C/6/9/C690CC33-18F7-405D-B18A-0A8E199E531C/Windows8.1-KB2898850-x64.msu
+win2008_hotfixes_archived:
+  # no longer available
+  # enable tls support hotfix:
+  - kb: kb3154518
+    file: windows6.1-kb3154518-x64.msu
+    url: http://download.microsoft.com/download/6/8/0/680ee424-358c-4fdf-a0de-b45dee07b711/windows6.1-kb3154518-x64.msu
+  # fix: https://support.microsoft.com/en-us/topic/security-and-quality-rollup-for-net-framework-3-5-1-for-windows-7-sp1-and-windows-server-2008-r2-sp1-kb-4040980-71f9f600-4878-a9d4-6b36-93cafad2eefe
+  # enable tls support hotfix:
+  - kb: kb4040980
+    file: windows6.1-kb4040980-x64_83282fb5210091802984ead0d4175879056d602c.msu
+    url: http://download.windowsupdate.com/c/msdownload/update/software/secu/2017/09/windows6.1-kb4040980-x64_83282fb5210091802984ead0d4175879056d602c.msu
 
-dot_net_security_hotfix:
-  kb: KB2898850
-  file: windows8.1-kb2898850-x64_9ffdfdeac9011569d1b14cf2dbf926257c50186d.msu
-  url: http://download.windowsupdate.com/d/msdownload/update/software/secu/2014/04/windows8.1-kb2898850-x64_9ffdfdeac9011569d1b14cf2dbf926257c50186d.msu
+win2012_hotfixes_archived:
+  # no longer available
+  # dot net security hotfix:
+  - kb: KB2898850
+    file: Windows8.1-KB2898850-x64.msu
+    url: http://download.microsoft.com/download/C/6/9/C690CC33-18F7-405D-B18A-0A8E199E531C/Windows8.1-KB2898850-x64.msu
+  # superseded
+  # dot net security hotfix:
+  - kb: KB2898850
+    file: windows8.1-kb2898850-x64_9ffdfdeac9011569d1b14cf2dbf926257c50186d.msu
+    url: http://download.windowsupdate.com/d/msdownload/update/software/secu/2014/04/windows8.1-kb2898850-x64_9ffdfdeac9011569d1b14cf2dbf926257c50186d.msu
+
+winrm_enable_script_url: https://raw.githubusercontent.com/ansible/ansible-documentation/devel/examples/scripts/ConfigureRemotingForAnsible.ps1
+enable_winrm_command: "& $([scriptblock]::Create((New-Object Net.WebClient).DownloadString('{{ winrm_enable_script_url }}'))) -ForceNewSSLCert -EnableCredSSP"
 
 windows_update_agent_url: http://download.windowsupdate.com/windowsupdate/redist/standalone/7.6.7600.320/windowsupdateagent-7.6-x64.exe
 
@@ -49,32 +79,40 @@ bleachbit_download_url: https://download.bleachbit.org/BleachBit-4.0.0-portable.
 sdelete_download_url: https://download.sysinternals.com/files/SDelete.zip
 ultradefrag_download_url: https://downloads.sourceforge.net/project/ultradefrag/stable-release/7.1.4/ultradefrag-portable-7.1.4.bin.amd64.zip
 
-enable_auto_logon: yes
+enable_auto_logon: true
 
-target_ovirt: no
-target_qemu: no
-target_ec2: no
-target_vagrant: no
+target_ovirt: false
+target_qemu: false
+target_ec2: false
+target_vagrant: false
+target_openstack: false
 
-bleachbit_clean: yes
-bleachbit_free_disk_space: yes
+bleachbit_clean: true
+bleachbit_free_disk_space: true
 
 ec2_ena_driver_role: oatakan.windows_ec2_ena_driver
 ovirt_guest_agent_role: oatakan.windows_ovirt_guest_agent
 virtio_role: oatakan.windows_virtio
 vmware_tools_role: oatakan.windows_vmware_tools
 virtualbox_guest_additions_role: oatakan.windows_virtualbox_guest_additions
+parallels_tools_role: oatakan.windows_parallels_tools
+windows_configure_update_role: oatakan.windows_configure_update
 windows_update_role: oatakan.windows_update
 windows_powershell_upgrade_role: oatakan.windows_powershell_upgrade
+windows_hotfix_role: oatakan.windows_hotfix
 
 policy:
-  allow_unauthenticated_guest_access: no
+  allow_unauthenticated_guest_access: false
+  disable_eos_reminder: true
+  install_webclient_service: false # installed on workstation by default, only applies to server
+
+webclient_maximum_file_size: 0xffffffff # 4GB default value is 50 MB
 
 local_administrator_password: Chang3MyP@ssw0rd21
 local_account_username: ansible
 local_account_password: Chang3MyP@ssw0rd21
 
-shutdown_instance: yes
+shutdown_instance: true
 
 winsxs_cleanmgr_file:
   2008r2: '{{ ansible_env.windir }}\winsxs\amd64_microsoft-windows-cleanmgr_31bf3856ad364e35_6.1.7600.16385_none_c9392808773cd7da\cleanmgr.exe'

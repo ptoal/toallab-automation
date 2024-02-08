@@ -1,14 +1,19 @@
 ---
 
+- name: Get user information
+  user:
+    name: "{{ container_run_as_user }}"
+  check_mode: true
+  changed_when: false
+  register: user_info
+
+- name: Fails if user "{{ container_run_as_user }}" doesn't exist
+  fail:
+    msg: User "{{ container_run_as_user }}" doesn't exist.
+  when: user_info.name is not defined
+
 - name: prepare rootless stuff if needed
   block:
-
-    - name: get user information
-      user:
-        name: "{{ container_run_as_user }}"
-      check_mode: true
-      register: user_info
-
     - name: set systemd dir if user is not root
       set_fact:
         service_files_dir: "{{ user_info.home }}/.config/systemd/user"
@@ -24,38 +29,28 @@
 
   when: container_run_as_user != "root"
 
-- name: "Find uid of user"
-  command: "id -u {{ container_run_as_user }}"
-  register: container_run_as_uid
-  check_mode: false  # Run even in check mode, to avoid fail with --check.
-  changed_when: false
-
 - name: set systemd runtime dir
   set_fact:
-    xdg_runtime_dir: "/run/user/{{ container_run_as_uid.stdout }}"
+    xdg_runtime_dir: "/run/user/{{ user_info.uid }}"
   changed_when: false
 
 - name: set systemd scope to system if needed
   set_fact:
     systemd_scope: system
-    service_files_dir: /usr/local/lib/systemd/system
-    xdg_runtime_dir: "/run/user/{{ container_run_as_uid.stdout }}"
+    service_files_dir: "{{ service_files_dir }}"
   when: container_run_as_user == "root"
   changed_when: false
 
 - name: create local systemd directory
-  when: service_files_dir == '/usr/local/lib/systemd/system'
   file:
     group: root
     mode: u=rwX,go=rX
     owner: root
     path: /usr/local/lib/systemd/system/
     state: directory
+  become: true
+  when: container_run_as_user == "root" and service_files_dir == '/usr/local/lib/systemd/system'
 
-- name: check if service file exists already
-  stat:
-    path: "{{ service_files_dir }}/{{ service_name }}"
-  register: service_file_before_template
 
 - name: do tasks when "{{ service_name }}" state is "running"
   block:
@@ -91,73 +86,71 @@
       state: present
     when: not skip_podman_install
 
-  - name: check user exists
-    user:
-      name: "{{ container_run_as_user }}"
-
   - name: Check subuid & subgid
     import_tasks: check_subid.yml
 
-  - name: running single container, get image Id if it exists and we are root
-    # XXX podman doesn't work through sudo for non root users,
-    # so skip preload if user
-    # https://github.com/containers/libpod/issues/5570
-    # command: podman inspect -f {{.Id}} "{{ container_image }}"
-    command: "podman image inspect -f '{{ '{{' }}.Id{{ '}}' }}' {{ item }}"
+  - name: Ensure empty internal variable _container_image_list
+    set_fact:
+      _container_image_list: []
     changed_when: false
-    register: pre_pull_id
-    ignore_errors: true
-    when:
-      - container_image_list is defined
-      - container_image_list | length == 1
-      - container_run_as_user == 'root'
+
+  - name: Convert container_image_list to new form
+    set_fact:
+      _container_image_list: "{{ _container_image_list + [{'image': item}] }}"
     with_items: "{{ container_image_list }}"
+    when: not (container_image_list | selectattr("image", "defined"))
+    changed_when: false
+    no_log: true
+
+  - name: Always use internal variable for container_image_list
+    set_fact:
+      _container_image_list: "{{ container_image_list }}"
+    when: _container_image_list | length == 0
+    changed_when: false
+    no_log: true
 
   - name: running single container, ensure we have up to date container image
     containers.podman.podman_image:
-      name: "{{ item }}"
+      name: "{{ item.image }}"
       force: true
-      username: "{{ container_image_user | default(omit) }}"
-      password: "{{ container_image_password | default(omit) }}"
+      username: "{{ item.user | default(container_image_user) | default(omit) }}"
+      password: "{{ item.password | default(container_image_password) | default(omit) }}"
     notify: restart service
     become: true
     become_user: "{{ container_run_as_user }}"
     when:
-      - container_image_list is defined
-      - container_image_list | length == 1
+      - _container_image_list | length == 1
       - container_run_as_user == 'root'
-    with_items: "{{ container_image_list }}"
-
-  - name: running single container, get image Id if it exists
-    command:
-      "podman image inspect -f '{{ '{{' }}.Id{{ '}}' }}'  {{ item }}"
-    changed_when: false
-    become: true
-    become_user: "{{ container_run_as_user }}"
-    register: post_pull_id
-    ignore_errors: true
-    when:
-      - container_image_list is defined
-      - container_image_list | length == 1
-      - container_run_as_user == 'root'
-    with_items: "{{ container_image_list }}"
+      - not (item.image | regex_search ('^localhost/.*'))
+    loop: "{{ _container_image_list }}"
+    no_log: true
 
   - name: seems we use several container images, ensure all are up to date
     containers.podman.podman_image:
-      name: "{{ item }}"
+      name: "{{ item.image }}"
       force: true
-      username: "{{ container_image_user | default(omit) }}"
-      password: "{{ container_image_password | default(omit) }}"
+      username: "{{ item.user | default(container_image_user) | default(omit) }}"
+      password: "{{ item.password | default(container_image_password) | default(omit) }}"
     become: true
     become_user: "{{ container_run_as_user }}"
-    when: container_image_list is defined and container_image_list | length > 1
-    with_items: "{{ container_image_list }}"
+    when:
+      - _container_image_list | length > 1
+      - not (item.image | regex_search ('^localhost/.*'))
+    loop: "{{ _container_image_list }}"
+    no_log: true
+
+  - name: Include pod yaml templating
+    ansible.builtin.include_tasks: deploy_pod_yaml.yml
+    when:
+      - container_pod_yaml is defined
+      - container_pod_yaml_deploy
 
   - name: if running pod, ensure configuration file exists
     stat:
       path: "{{ container_pod_yaml }}"
     register: pod_file
     when: container_pod_yaml is defined
+
   - name: fail if pod configuration file is missing
     fail:
       msg: >
@@ -179,41 +172,32 @@
       - container_run_as_user != "root"
       - not user_lingering.stat.exists
 
-  - name: "create systemd service file for container: {{ container_name }}"
-    template:
-      src: systemd-service-single.j2
-      dest: "{{ service_files_dir }}/{{ service_name }}"
-      owner: root
-      group: root
-      mode: 0644
-    notify:
-      - reload systemctl
-      - start service
-      - enable service
-    register: service_file
-    when: container_image_list is defined and container_image_list | length == 1
-
-  - name: "create systemd service file for pod: {{ container_name }}"
-    template:
-      src: systemd-service-pod.j2
-      dest: "{{ service_files_dir }}/{{ service_name }}"
-      owner: root
-      group: root
-      mode: 0644
-    notify:
-      - reload systemctl
-      - start service
-      - enable service
-    register: service_file
-    when: container_image_list is defined and container_image_list | length > 1
-
-  - name: "ensure {{ service_name }} is restarted due config change"
-    debug: msg="config has changed:"
-    changed_when: true
-    notify: restart service
+  - name: Ensure volume directories exist for {{ container_name }}
+    file:
+      path: "{{ item }}"
+      owner: "{{ container_dir_owner | default(container_run_as_user) }}"
+      group: "{{ container_dir_group | default(container_run_as_group) }}"
+      mode: "{{ container_dir_mode | default(omit) }}"
+      state: directory
+    become: true
+    loop: "{{ container_run_args | regex_findall('-v ([^:]*)') }}"
     when:
-      - service_file_before_template.stat.exists
-      - service_file.changed
+      - _container_image_list | length == 1
+      - container_run_args is defined and container_run_args | length > 0
+      - container_pod_yaml is undefined
+
+  - name: Create systemd service file for {{ container_name }}
+    template:
+      src: "{% if _container_image_list | length == 1 %}systemd-service-single.j2{% else %}systemd-service-pod.j2{% endif %}"
+      dest: "{{ service_files_dir }}/{{ service_name }}"
+      owner: "{{ service_files_owner }}"
+      group: "{{ service_files_group }}"
+      mode: "{{ service_files_mode }}"
+    become: true
+    notify:
+      - reload systemctl
+      - restart service
+    register: service_file
 
   - name: ensure auto update is running for images
     become: true
@@ -232,53 +216,44 @@
 - name: configure firewall if container_firewall_ports is defined
   block:
 
-  - name: set firewall ports state to enabled when container state is running
-    set_fact:
-      fw_state: enabled
-    when: container_state == "running"
-
-  - name: disable firewall ports state when container state is not running
-    set_fact:
-      fw_state: disabled
-    when: container_state != "running"
-
   - name: ensure firewalld is installed
     tags: firewall
     package: name=firewalld state=present
+    become: true
     when: ansible_pkg_mgr != "atomic_container"
 
-  - name: ensure firewalld is installed (on fedora-iot)
-    tags: firewall
-    command: >-
-      rpm-ostree install --idempotent --unchanged-exit-77
-      --allow-inactive firewalld
-    register: ostree
-    failed_when: not ( ostree.rc == 77 or ostree.rc == 0 )
-    changed_when: ostree.rc != 77
+  - name: Ensure firewalld is installed (rpm-ostree)
     when: ansible_pkg_mgr == "atomic_container"
+    block:
+      - name: Ensure firewalld is installed (rpm-ostree)
+        tags: firewall
+        community.general.rpm_ostree_pkg:
+          name: firewalld
+        become: true
+        register: ostree
 
-  - name: reboot if new stuff was installed
-    reboot:
-      reboot_timeout: 300
-    when:
-      - ansible_pkg_mgr == "atomic_container"
-      - ostree.rc != 77
+      - name: Reboot if firewalld was installed
+        reboot:
+          reboot_timeout: 300
+        become: true
+        when: ostree is changed
 
-  - name: ensure firewall service is running
+  - name: Ensure firewall service is running
     tags: firewall
-    service: name=firewalld state=started
+    service:
+      name: firewalld
+      state: started
+    become: true
 
-  - name: ensure container's exposed ports firewall state
+  - name: Ensure container's exposed ports firewall state
     tags: firewall
     ansible.posix.firewalld:
       port: "{{ item }}"
       permanent: true
       immediate: true
-      state: "{{ fw_state }}"
+      state: "{% if container_state == 'running' %}enabled{% else %}disabled{% endif %}"
+    become: true
     with_items: "{{ container_firewall_ports }}"
-
-  - name: Force all notified handlers to run at this point
-    meta: flush_handlers
 
   when: container_firewall_ports is defined
 
@@ -286,20 +261,13 @@
 - name: do cleanup stuff when container_state is "absent"
   block:
 
-  - name: ensure "{{ service_name }}" is disabled at boot
-    become: true
-    become_user: "{{ container_run_as_user }}"
-    # become_method: machinectl
-    environment:
-      XDG_RUNTIME_DIR: "{{ xdg_runtime_dir }}"
-    systemd:
-      name: "{{ service_name }}"
-      enabled: false
-      scope: "{{ systemd_scope }}"
-    when:
-      - service_file_before_template.stat.exists
+  - name: Check if service file exists
+    stat:
+      path: "{{ service_files_dir }}/{{ service_name }}"
+    register: service_file
 
-  - name: ensure "{{ service_name }}" is stopped
+
+  - name: Ensure "{{ service_name }}" is stopped and disabled at boot
     become: true
     become_user: "{{ container_run_as_user }}"
     # become_method: machinectl
@@ -311,16 +279,14 @@
       enabled: false
       scope: "{{ systemd_scope }}"
     when:
-      - service_file_before_template.stat.exists
+      - service_file.stat.exists
 
   - name: clean up systemd service file
     file:
       path: "{{ service_files_dir }}/{{ service_name }}"
       state: absent
+    become: true
     notify: reload systemctl
-
-  - name: Force all notified handlers to run at this point
-    meta: flush_handlers
 
   - name: Check if user is lingering
     stat:
@@ -341,3 +307,6 @@
     when: container_pod_yaml is defined
 
   when: container_state == "absent"
+
+- name: Force all notified handlers to run at this point
+  meta: flush_handlers

@@ -1,12 +1,14 @@
 ---
 
+role_action: provision #provision or deprovision
+
 install_updates: yes
 instance_wait_retry_limit: 300
 instance_wait_connection_timeout: 600
 
 # this will remove existing template with the same name
-template_force: no
-template_found: no
+template_force: false
+template_found: false
 
 export_ovf: no
 
@@ -22,13 +24,13 @@ qemu_second_cdrom_device_bus_type: ide
 qemu_second_cdrom_device_bus_id: 3
 qemu_second_cdrom_device_bus_unit: 0
 
-local_administrator_password: Chang3MyP@ssw0rd21
+local_administrator_password: ''
 local_account_username: ansible
-local_account_password: Chang3MyP@ssw0rd21
+local_account_password: ''
 
-distro_name: rhel8
-iso_file_name: CentOS-8.4.2105-x86_64-dvd1.iso
-linux_ks_folder: rhel8
+distro_name: rhel9
+iso_file_name: CentOS-Stream-9-latest-x86_64-dvd1.iso
+linux_ks_folder: rhel9
 
 template_vm_name: centos84-x64-v1
 template_vm_root_disk_size: 10
@@ -36,7 +38,7 @@ template_vm_root_disk_format: cow
 template_vm_root_disk_interface: virtio
 template_vm_memory: 4096
 template_vm_cpu: 2
-template_vm_guest_id: rhel_7x64
+template_vm_guest_id: rhel_8x64
 template_vm_efi: no
 template_vm_network_name: ovirtmgmt
 template_vm_ip_address: 192.168.10.96
@@ -51,6 +53,8 @@ template_convert_timeout: 600
 template_convert_seal: no
 template_selinux_enabled: no
 
+permit_root_login_with_password: true
+
 ovirt_datacenter: mydatacenter
 ovirt_cluster: production
 ovirt_folder: template
@@ -64,4 +68,7 @@ os_short_names:
     guest_id: rhel_7x64
   rhel8:
     ks_folder: rhel8
+    guest_id: rhel_8x64
+  rhel9:
+    ks_folder: rhel9
     guest_id: rhel_8x64

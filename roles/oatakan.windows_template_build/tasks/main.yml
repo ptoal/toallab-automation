@@ -7,22 +7,71 @@
 - name: run setup module
   setup:
 
-- include_tasks: hotfix-tlsv12.yml
+- block:
+    # This is needed where many tasks and polls run against the windows target where it reaches the limit
+    # Default value is 1500
+    - name: increase MaxConcurrentOperationsPerUser
+      ansible.windows.win_shell: |
+        winrm set winrm/config/service @{MaxConcurrentOperationsPerUser="20000"}
+      args:
+        executable: cmd
+
+    # first we need to fix SSL connections with the hotfix
+    - include_role:
+        name: "{{ windows_hotfix_role }}"
+      vars:
+        hotfix: "{{ win2008_hotfixes[0] }}"
+
+    - include_tasks: install_dism.yml
+
+    # enable TLS 1.2 with an hotfix
+    - include_role:
+        name: "{{ windows_hotfix_role }}"
+      vars:
+        hotfix: "{{ win2008_hotfixes[1] }}"
   when: "'Windows Server 2008' in ansible_distribution or 'Windows 7' in ansible_distribution"
 
-- include_tasks: enable-tlsv12.yml
+- include_tasks: enable_tlsv12.yml
 
-- include_tasks: update-agent-win2008.yml
+- include_tasks: update_agent_win2008.yml
   when: "'Windows Server 2008' in ansible_distribution or 'Windows 7' in ansible_distribution"
-
-- include_tasks: security-update-win2012.yml
-  when: "'Windows Server 2012' in ansible_distribution or 'Windows 8' in ansible_distribution"
-
-- include_tasks: disable-auto-logon.yml
 
 - include_role:
-    name: "{{ windows_update_role }}"
+    name: "{{ windows_hotfix_role }}"
+  loop: "{{ win2012_hotfixes[os_version_name | default('os_6_3')] }}"
+  loop_control:
+    loop_var: hotfix
+  when: "'Windows Server 2012' in ansible_distribution or 'Windows 8' in ansible_distribution"
+
+- include_tasks: disable_auto_logon.yml
+
+- block:
+    - include_role:
+        name: "{{ windows_configure_update_role }}"
+      vars:
+        role_action: register
+        wsus_server: "{{ win_update_server }}"
+        register_with_wsus: true
+      when: win_update_server | length > 0
+
+    - include_role:
+        name: "{{ windows_update_role }}"
+      vars:
+        win_update_server_selection: "{{ 'managed_server' if (win_update_server | length > 0) else 'default' }}"
+  always:
+    - include_role:
+        name: "{{ windows_configure_update_role }}"
+      vars:
+        role_action: unregister
+      when: win_update_server | length > 0
   when: install_updates | bool
+
+- name: ensure windows update service stopped and disabled
+  ansible.windows.win_service:
+    name: wuauserv
+    state: stopped
+    start_mode: disabled
+  ignore_errors: true
 
 - include_role:
     name: "{{ ovirt_guest_agent_role }}"
@@ -30,15 +79,19 @@
 
 - include_role:
     name: "{{ virtio_role }}"
-  when: target_qemu | bool or ('KubeVirt' in ansible_system_vendor | default(''))
+  when: target_qemu | bool or ('KubeVirt' in (ansible_system_vendor | default('', true)))
 
 - include_role:
     name: "{{ virtualbox_guest_additions_role }}"
-  when: "'VirtualBox' in ansible_product_name"
+  when: ('VirtualBox' in (ansible_product_name | default('', true)))
 
 - include_role:
     name: "{{ vmware_tools_role }}"
-  when: "'VMware' in ansible_product_name"
+  when: ('VMware' in (ansible_product_name | default('', true)))
+
+- include_role:
+    name: "{{ parallels_tools_role }}"
+  when: ('Parallels' in (ansible_product_name | default('', true))) or (ansible_product_name == None and 'Parallels' in ansible_interfaces[0].interface_name)
 
 - include_tasks: startup.yml
 
@@ -47,21 +100,21 @@
 - include_tasks: power.yml
   when: (ansible_os_product_type == 'workstation') | default(False)
 
-- include_tasks: enable-rdp.yml
+- include_tasks: enable_rdp.yml
 
 - include_tasks: cloudbase-init.yml
   when:
-    - "'VMware' not in ansible_product_name"
-    - "'VirtualBox' not in ansible_product_name"
-    - ('KubeVirt' not in ansible_system_vendor | default(False))
-    - ('Red Hat' not in ansible_system_vendor | default(False))
+    - ('VMware' not in (ansible_product_name | default('', true)))
+    - ('VirtualBox' not in (ansible_product_name | default('', true)))
+    - ('KubeVirt' not in (ansible_system_vendor | default('', true)))
+    - ('Red Hat' not in (ansible_system_vendor | default('', true))) or target_openstack | bool
     - not target_ovirt | bool
     - not target_vagrant | bool
 
 - block:
-    - include_tasks: remove-apps-alt-2.yml
+    - include_tasks: remove_apps-alt-2.yml
 
-    - include_tasks: remove-onedrive.yml
+    - include_tasks: remove_onedrive.yml
   when:
     - remove_apps | bool
     - (ansible_os_product_type == 'workstation') | default(False)
@@ -73,14 +126,21 @@
 - name: run all handlers here
   meta: flush_handlers
 
-- include_tasks: clean-up-components.yml
+- include_tasks: clean_up_components.yml
   when: clean_up_components | bool
 
-- include_tasks: clean-up.yml
+- include_tasks: clean_up.yml
 
 - include_tasks: sysprep.yml
 
 - include_tasks: compact.yml
+
+- name: ensure windows update service is enabled
+  ansible.windows.win_service:
+    name: wuauserv
+    state: stopped
+    start_mode: auto
+  ignore_errors: true
 
 - include_tasks: shutdown.yml
   when: shutdown_instance | bool

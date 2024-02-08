@@ -8,6 +8,9 @@ container_state: running
 # by default we want to restart failed container
 container_restart: on-failure
 service_files_dir: /usr/local/lib/systemd/system
+service_files_owner: root
+service_files_group: root
+service_files_mode: 0644
 systemd_scope: system
 systemd_TimeoutStartSec: 15
 systemd_RestartSec: 30
@@ -30,9 +33,14 @@ systemd_Wants: []
 service_name: "{{ container_name }}-container-pod-{{ container_run_as_user }}.service"
 
 # to sepped up you can disable always checking if podman is installed.
-skip_podman_install: true
+skip_podman_install: false
 
 podman_dependencies_rootless:
   - fuse-overlayfs
   - slirp4netns
   - uidmap
+
+# pod yaml deploy
+container_pod_yaml_deploy: false
+container_pod_yaml_template: templates/container-pod-yaml.j2
+container_pod_yaml_template_validation: false

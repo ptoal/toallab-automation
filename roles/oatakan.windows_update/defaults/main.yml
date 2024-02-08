@@ -1,17 +1,31 @@
 ---
 
+install_updates_retry_limit: 300
 update_retry_count: 0
 update_retry_limit: 10
-win_update_category_names:
-  - CriticalUpdates
-  - DefinitionUpdates
-  - SecurityUpdates
-  - UpdateRollups
-  - Updates
 
-hotfix_download_location: "{{ ansible_env.TEMP }}"
+win_update_category_names: '*'
+#win_update_category_names:
+#  - CriticalUpdates
+#  - DefinitionUpdates
+#  - FeaturePacks
+#  - SecurityUpdates
+#  - UpdateRollups
+#  - Updates
 
-hotfixes_group_1:
+win_update_reject_list: []
+win_update_accept_list: []
+win_update_server_selection: default
+win_update_disable_firewall: yes
+failed_kb: []
+
+windows_update_disable_firewall: true
+
+temp_directory: "{{ ansible_env.TEMP }}"
+
+windows_hotfix_role: oatakan.windows_hotfix
+
+hotfixes:
   - kb: KB3020369
     file: Windows6.1-KB3020369-x64.msu
     url: https://download.microsoft.com/download/F/D/3/FD3728D5-0D2F-44A6-B7DA-1215CC0C9B75/Windows6.1-KB3020369-x64.msu

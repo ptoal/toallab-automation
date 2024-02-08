@@ -13,7 +13,7 @@ network --bootproto=dhcp
 
 network --hostname=localhost.localdomain
 rootpw {{ local_administrator_password }}
-authconfig --enableshadow --passalgo=sha512
+authselect --enableshadow --passalgo=sha512
 
 {% if template_selinux_enabled is undefined or not template_selinux_enabled %}
 selinux --disabled

@@ -6,6 +6,8 @@ iso_file: "linux_{{ distro_name }}_ks{{ awx_job_id | default('') }}.iso"
 
 export_dir: "{{ playbook_dir }}/{{ temp_directory }}"
 
+remove_template: "{{ true if (role_action == 'deprovision' or template_force|bool) else false }}"
+
 providers:
   ovirt:
     datacenter: "{{ ovirt_datacenter }}"
@@ -39,8 +41,8 @@ template:
       dns_servers: "{{ template_vm_dns_servers }}"
   cd_iso: "{{ iso_file_id | default(iso_file_name) }}"  # if using data domain, file name does not work, need to use id
 
-linux_ks_folder: "{{ os_short_names[(distro_name|default('rhel_80'))].ks_folder | default('rhel8') }}"
-template_vm_guest_id: "{{ os_short_names[(distro_name|default('rhel_80'))].guest_id | default('rhel_8x64') }}"
+linux_ks_folder: "{{ os_short_names[(distro_name|default('rhel8'))].ks_folder | default('rhel8') }}"
+template_vm_guest_id: "{{ os_short_names[(distro_name|default('rhel8'))].guest_id | default('rhel_8x64') }}"
 
 qemu_cmdline_second_iso:
   - -device

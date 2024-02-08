@@ -1,5 +1,9 @@
 ---
 
+- name: set template_found to false
+  set_fact:
+    template_found: false
+
 - name: get the datacenter name (<2.9)
   ovirt_datacenter_facts:
     auth: "{{ ovirt_auth }}"
@@ -33,35 +37,37 @@
 
 
 - block:
-    - name: set template_found to yes
+    - name: set template_found to true
       set_fact:
-        template_found: yes
+        template_found: true
 
     - name: fail with message
       fail:
         msg: "Existing template found on ovirt/rhv: {{ template.name }}"
-      when: not template_force|bool
+      when: not remove_template
   when:
     - ovirt_templates is defined
     - ovirt_templates | length > 0
 
-- name: check iso file on data domain
-  ovirt_disk_facts:
-    auth: "{{ ovirt_auth }}"
-    pattern: "name={{ iso_file_name }}"
-  when: iso_file_name is defined
+- block:
+    - name: check iso file on data domain
+      ovirt_disk_facts:
+        auth: "{{ ovirt_auth }}"
+        pattern: "name={{ iso_file_name }}"
+      when: iso_file_name is defined
 
-- name: set file id of the iso file
-  set_fact:
-    iso_file_id: "{{ ovirt_disks[0].id }}"
-  when:
-    - ovirt_disks | length > 0
-    - ovirt_disks[0].id is defined
-    - ovirt_disks[0].content_type == 'iso'
+    - name: set file id of the iso file
+      set_fact:
+        iso_file_id: "{{ ovirt_disks[0].id }}"
+      when:
+        - ovirt_disks | length > 0
+        - ovirt_disks[0].id is defined
+        - ovirt_disks[0].content_type == 'iso'
 
-- name: fail with message
-  fail:
-    msg: "iso file ({{ template.name }}) could not be found on the data domain and iso domain does not exists"
-  when:
-    - iso_file_id is undefined
-    - iso_domain is undefined or iso_domain|length == 0
+    - name: fail with message
+      fail:
+        msg: "iso file ({{ template.name }}) could not be found on the data domain and iso domain does not exists"
+      when:
+        - iso_file_id is undefined
+        - iso_domain is undefined or iso_domain|length == 0
+  when: role_action == 'provision'

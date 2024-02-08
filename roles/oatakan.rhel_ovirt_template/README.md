@@ -39,12 +39,13 @@ Example Playbook
 
 Including an example of how to use your role (for instance, with variables passed in as parameters) is always nice for users too:
 
+    ---
     # import ovirt.ovirt collections
     - name: create a ovirt rhel template
       hosts: all
-      gather_facts: False
+      gather_facts: false
       connection: local
-      become: no
+      become: false
       vars:
         template_force: yes #overwrite existing template with the same name
         export_ovf: no # export the template to export domain upon creation
@@ -74,6 +75,18 @@ Including an example of how to use your role (for instance, with variables passe
     
       roles:
         - oatakan.rhel_ovirt_template
+
+    ---
+    # import ovirt.ovirt collections
+    - name: delete a ovirt rhel template
+      hosts: all
+      gather_facts: false
+      connection: local
+      become: false
+
+      roles:
+        - role: oatakan.rhel_ovirt_template
+          role_action: deprovision
 
 License
 -------

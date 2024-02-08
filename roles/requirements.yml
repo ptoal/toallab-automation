@@ -1,21 +1,9 @@
 # Java
 - name: geerlingguy.java
-# Node.js (Using this repo temporarily, as it fixes a package naming bug (See #95))
-# - src: https://github.com/halkeye/ansible-role-nodejs
-#   version: halkeye-patch-1
-# Gitlab
-- name: geerlingguy.gitlab
 # Windows Ovirt Template
-- name: oatakan.windows_ovirt_template
-  src: git+https://github.com/oatakan/ansible-role-windows_ovirt_template.git
 - name: oatakan.windows_template_build
-- name: oatakan.ansible-role-windows-ad-controller
-  src: git+https://github.com/oatakan/ansible-role-windows-ad-controller.git
-- name: oatakan.windows_ovirt_guest_agent
 - name: oatakan.windows_virtio
 - name: oatakan.windows_update
-- name: oatakan.ansible-role-ovirt
-  src: git+https://github.com/oatakan/ansible-role-ovirt.git
 - name: oatakan.rhel_template_build
 - name: oatakan.rhel_ovirt_template
 - name: ikke_t.podman_container_systemd
