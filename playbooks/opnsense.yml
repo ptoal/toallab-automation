@@ -1,0 +1,32 @@
+---
+- name: Get info on the existing host entries
+  hosts: localhost
+  gather_facts: false
+  module_defaults:
+    group/ansibleguy.opnsense.all:
+      firewall: '{{ lookup("env","OPNSENSE_HOST") }}'
+      api_key: '{{ lookup("env","OPNSENSE_API_KEY") }}'
+      api_secret: '{{ lookup("env","OPNSENSE_API_SECRET") }}'
+      api_port: 8443
+
+    ansibleguy.opnsense.unbound_host:
+      match_fields: ['description']
+
+    ansibleguy.opnsense.list:
+      target: 'unbound_host'
+
+  tasks:
+    - name: Listing hosts # noqa args[module]
+      ansibleguy.opnsense.list:
+        target: 'unbound_host'
+      register: existing_entries
+
+    - name: Printing entries
+      ansible.builtin.debug:
+        var: existing_entries.data
+
+    - name: Generate csv from template
+      ansible.builtin.template:
+        src: ../templates/hosts.j2
+        mode: "0644"
+        dest: "/data/output.csv"

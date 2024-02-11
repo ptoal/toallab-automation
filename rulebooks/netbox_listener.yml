@@ -1,0 +1,25 @@
+---
+- name: Listen for Netbox Events
+  hosts: all
+  sources:
+    - name: Netbox Listener
+      ansible.eda.webhook:
+        port: 9102
+        host: 0.0.0.0
+  rules:
+    - name: Run Template
+      condition:
+        all:
+          - true
+      actions:
+        - print_event:
+            pretty: true
+              #        - run_job_template:
+              #            name: Demo - Clean Log Directory
+              #            organization: OYS
+              #            job_args:
+              #              extra_vars:
+              #                alertmanager_annotations: "{{ event.alert.annotations }}"
+              #                alertmanager_generator_url: "{{ event.alert.generatorURL }}"
+              #                event_mountpoint: "{{ event.alert.labels.mountpoint }}"
+              #                alertmanager_instance: "{{ event.alert.labels.instance }}"

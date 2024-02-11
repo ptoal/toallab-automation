@@ -1,0 +1,4 @@
+hostname, domain, description, enabled, mx, mxprio, prio, record_type, server, value, uuid
+{% for i in existing_entries.data %}
+{{ i.hostname }},{{ i.domain }},{{ i.description }},{{ i.enabled }},{{ i.mx }},{{ i.mxprio }},{{ i.prio }},{{ i.record_type }},{{ i.server }},{{ i.value }},{{ i.uuid }}
+{% endfor %}
