@@ -10,7 +10,7 @@
     - name: Run Template
       condition:
         all:
-          - "event.facts is defined"
+          - "event.data is defined"
       actions:
         - print_event:
             pretty: true
