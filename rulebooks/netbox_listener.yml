@@ -10,7 +10,7 @@
     - name: Run Template
       condition:
         all:
-          - "event is defined"
+          - "true"
       action:
         print_event:
           pretty: true
