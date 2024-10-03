@@ -11,6 +11,6 @@
       condition:
         all:
           - "event is defined"
-      actions:
-        - print_event:
-            pretty: true
+      action:
+        print_event:
+          pretty: true
